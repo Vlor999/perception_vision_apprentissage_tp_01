@@ -13,6 +13,18 @@ import os
 
 from PyQt5.QtCore import QLibraryInfo
 
+def display_graphs(plots):
+    # create a new figure
+    plt.figure()
+
+    # loop over the plots and add each one to the figure
+    for key, values in plots.items():
+        plt.plot(values, label=key)
+
+    # add a legend and show the plot
+    plt.legend()
+    plt.show()
+
 if __name__ == '__main__':
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = QLibraryInfo.location(QLibraryInfo.PluginsPath)
 
@@ -167,6 +179,7 @@ if __name__ == '__main__':
     plt.figure()
 
     # TODO: build and save matplotlib plot
+    display_graphs(plots)
 
     # save the training plot
     plt.savefig(config.PLOT_PATH)

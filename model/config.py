@@ -5,8 +5,7 @@ from torchvision import transforms
 
 # define the base path to the input dataset and then use it to derive
 # the path to the input images and annotation CSV files
-#BASE_PATH = "/matieres/5MMVORF/01-dataset"
-BASE_PATH = "/Users/sergipujades/Development/vorf/datasets/01-dataset"
+BASE_PATH = "/matieres/5MMVORF/01-dataset"
 
 IMAGES_PATH = os.path.join(BASE_PATH, "images")
 ANNOTS_PATH = os.path.join(BASE_PATH, "annotations")
