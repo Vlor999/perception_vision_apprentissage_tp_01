@@ -1,12 +1,13 @@
-from model import config
+from src import config
 import sys
 import os
 import torch
 import cv2
+from loguru import logger
 
 # load our object detector, set it evaluation mode, and label
 # encoder from disk
-print("**** loading object detector...")
+logger.debug("**** loading object detector...")
 model = torch.load(config.LAST_MODEL_PATH).to(config.DEVICE)
 model.eval()
 

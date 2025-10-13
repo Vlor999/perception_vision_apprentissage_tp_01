@@ -1,6 +1,6 @@
-from model.dataset import ImageDataset
-from model.network import SimpleDetector as ObjectDetector
-from model import config
+from src.dataset import ImageDataset
+from src.network import SimpleDetector as ObjectDetector
+from src import config
 import torch
 from torch.utils.data import DataLoader
 from torch.nn import functional as fun
@@ -10,12 +10,31 @@ from collections import defaultdict
 import random
 import time
 import os
+from loguru import logger
+from src.arguments.handle_args import setup_args
 
 from PyQt5.QtCore import QLibraryInfo
 
+# Optimisations pour macOS
+def optimize_for_device():
+    """Optimise l'environnement selon le device utilisé"""
+    if config.DEVICE == "mps":
+        # Variables d'environnement pour MPS
+        os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+        os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+        logger.debug("**** Optimisations MPS activées")
+        
+        # Vider le cache MPS si disponible
+        if hasattr(torch, 'mps') and hasattr(torch.mps, 'empty_cache'):
+            torch.mps.empty_cache()
+    
+    elif config.DEVICE == "cpu":
+        # Optimiser pour CPU multi-thread
+        num_threads = os.cpu_count() or 4  # fallback à 4 si None
+        torch.set_num_threads(num_threads)
+        logger.debug(f"**** CPU optimisé avec {num_threads} threads")
+
 def display_graphs(plots):
-    # create a new figure
-    plt.figure()
 
     # loop over the plots and add each one to the figure
     for key, values in plots.items():
@@ -25,8 +44,24 @@ def display_graphs(plots):
     plt.legend()
     plt.show()
 
+def display_graphs_and_save(plots):
+    # loop over the plots and add each one to the figure
+    for key, values in plots.items():
+        plt.plot(values, label=key)
+
+    # add a legend
+    plt.legend()
+    
+    # IMPORTANT: save the figure BEFORE showing it
+    # plt.show() clears the figure, so we must save first
+    plt.savefig(config.PLOT_PATH)
+    logger.info(f"**** plot saved to {config.PLOT_PATH}")
+    
+    # then show the plot
+    plt.show()
+
 def load_data() -> list[str]:
-    print("**** loading dataset...")
+    logger.debug("**** loading dataset...")
     data = []
 
     # loop over all CSV files in the annotations directory
@@ -51,7 +86,7 @@ def get_loaders(data: list[str]) -> tuple[DataLoader, DataLoader, DataLoader]:
     train_dataset = ImageDataset(train_data, transforms=config.TRANSFORMS)
     val_dataset = ImageDataset(val_data, transforms=config.TRANSFORMS)
     test_dataset = ImageDataset(test_data, transforms=config.TRANSFORMS)
-    print(f"**** {len(train_data)} training, {len(val_data)} validation and "
+    logger.debug(f"**** {len(train_data)} training, {len(val_data)} validation and "
           f"{len(test_data)} test samples")
 
     # create data loaders
@@ -66,7 +101,7 @@ def get_loaders(data: list[str]) -> tuple[DataLoader, DataLoader, DataLoader]:
                              pin_memory=config.PIN_MEMORY)
 
     # save testing image paths to use for evaluating/testing our object detector
-    print("**** saving training, validation and testing split data as CSV...")
+    logger.debug("**** saving training, validation and testing split data as CSV...")
     with open(config.TEST_PATH, "w") as f:
         f.write("\n".join([','.join(row) for row in test_data]))
     with open(config.VAL_PATH, "w") as f:
@@ -77,7 +112,7 @@ def get_loaders(data: list[str]) -> tuple[DataLoader, DataLoader, DataLoader]:
     return train_loader, val_loader, test_loader
 
 # function to compute loss over a batch
-def compute_loss(loader, back_prop=False):
+def compute_loss(loader, object_detector, optimizer, back_prop=False):
     # initialize the total loss and number of correct predictions
     total_loss, correct = 0, 0
 
@@ -110,9 +145,9 @@ def compute_loss(loader, back_prop=False):
     # return sample-level averages of the loss and accuracy
     return total_loss / len(loader.dataset), correct / len(loader.dataset)
 
-def train(plots: dict, store_model: bool = False):
+def train(object_detector, optimizer, train_loader, val_loader, plots: dict, store_model: bool = False):
     # loop over epochs
-    print("**** training the network...")
+    logger.debug("**** training the network...")
     prev_val_acc = None
     prev_val_loss = None
     for e in range(config.NUM_EPOCHS):
@@ -122,14 +157,14 @@ def train(plots: dict, store_model: bool = False):
         # Do not use the returned loss
         # The loss of each batch is computed with a "different network"
         # as the weights are updated per batch
-        _, _ = compute_loss(train_loader, back_prop=True)
+        _, _ = compute_loss(loader=train_loader, object_detector=object_detector, optimizer=optimizer, back_prop=True)
 
         # switch off autograd
         with torch.no_grad():
             # set the model in evaluation mode and compute validation loss
             object_detector.eval()
-            train_loss, train_acc = compute_loss(train_loader)
-            val_loss, val_acc = compute_loss(val_loader)
+            train_loss, train_acc = compute_loss(loader=train_loader, object_detector=object_detector, optimizer=optimizer, back_prop=False)
+            val_loss, val_acc = compute_loss(loader=val_loader, object_detector=object_detector, optimizer=optimizer, back_prop=False)
 
         # update our training history
         plots['Training loss'].append(train_loss.cpu())
@@ -138,30 +173,37 @@ def train(plots: dict, store_model: bool = False):
         plots['Validation loss'].append(val_loss.cpu())
         plots['Validation class accuracy'].append(val_acc)
 
-        # print the model training and validation information
-        print(f"**** EPOCH: {e + 1}/{config.NUM_EPOCHS}")
-        print(f"Train loss: {train_loss:.8f}, Train accuracy: {train_acc:.8f}")
-        print(f"Val loss: {val_loss:.8f}, Val accuracy: {val_acc:.8f}")
+        # logger.debug the model training and validation information
+        logger.debug(f"**** EPOCH: {e + 1}/{config.NUM_EPOCHS}")
+        logger.debug(f"Train loss: {train_loss:.8f}, Train accuracy: {train_acc:.8f}")
+        logger.debug(f"Val loss: {val_loss:.8f}, Val accuracy: {val_acc:.8f}")
 
         # TODO: write code to store model with highest accuracy, lowest loss
-        if prev_val_acc is None and prev_val_loss and val_acc is not None and prev_val_loss is not None:
-            prev_val_acc = val_acc
+        if prev_val_loss is None and val_loss is not None:
             prev_val_loss = val_loss
+        if prev_val_acc is None and val_acc is not None:
+            prev_val_acc = val_acc
 
         if store_model and val_acc > prev_val_acc and val_loss < prev_val_loss:
             prev_val_acc = val_acc
             prev_val_loss = val_loss
 
             # serialize the model to disk
-            print("**** saving BEST object detector model...")
+            logger.info("**** saving BEST object detector model...")
             # When a network has dropout and / or batchnorm layers
             # one needs to explicitly set the eval mode before saving
             object_detector.eval()
             torch.save(object_detector, config.BEST_MODEL_PATH)
+        elif not store_model:
+            logger.debug(f"Val acc: {val_acc} - prev: {prev_val_acc}")
+            logger.debug(f"Val loss: {val_loss} - prev: {prev_val_loss}")
 
-
-if __name__ == '__main__':
+def main():
+    args = setup_args()
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = QLibraryInfo.location(QLibraryInfo.PluginsPath)
+
+    # Optimiser l'environnement selon le device
+    optimize_for_device()
 
     # initialize the list of data (images), class labels, target bounding
     # box coordinates, and image paths
@@ -172,31 +214,32 @@ if __name__ == '__main__':
     train_loader, val_loader, test_loader = get_loaders(data)
 
     # create our custom object detector model and upload to the current device
-    print("**** initializing network...")
+    logger.debug("**** initializing network...")
     object_detector = ObjectDetector(len(config.LABELS)).to(config.DEVICE)
 
     # initialize the optimizer, compile the model, and show the model summary
     optimizer = Adam(object_detector.parameters(), lr=config.INIT_LR)
-    print(object_detector)
+    logger.debug(object_detector)
 
     # initialize history variables for future plot
     plots = defaultdict(list)
 
-    print("**** saving LAST object detector model...")
+    logger.debug("**** saving LAST object detector model...")
     object_detector.eval()
     torch.save(object_detector, config.LAST_MODEL_PATH)
 
     start_time = time.time()
-    train(plots)
+    train(object_detector=object_detector, optimizer=optimizer, train_loader=train_loader, val_loader=val_loader, plots=plots, store_model=True)
     end_time = time.time()
-    print(f"**** total time to train the model: {end_time - start_time:.2f}s")
+    logger.debug(f"**** total time to train the model: {end_time - start_time:.2f}s")
 
     # plot the training loss and accuracy
     plt.style.use("ggplot")
     plt.figure()
 
     # TODO: build and save matplotlib plot
-    display_graphs(plots)
+    display_graphs_and_save(plots)
 
-    # save the training plot
-    plt.savefig(config.PLOT_PATH)
+
+if __name__ == '__main__':
+    main()

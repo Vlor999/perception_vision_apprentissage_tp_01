@@ -1,22 +1,23 @@
-from model import config
+from src import config
 import sys
 import os
 import torch
 import cv2
 import numpy
+from loguru import logger
 
 # load our object detector, set it evaluation mode, and label
 
 if len(sys.argv) < 2:
-    print("Please enter the path to the model to be evaluated")
+    logger.debug("Please enter the path to the model to be evaluated")
     sys.exit(1)
 
 model_path = sys.argv[1]
 
-print(f"**** loading object detector at {model_path}...")
+logger.debug(f"**** loading object detector at {model_path}...")
 model = torch.load(model_path).to(config.DEVICE)
 model.eval()
-print(f"**** object detector loaded")
+logger.debug(f"**** object detector loaded")
 
 results_labels = dict()
 
@@ -26,7 +27,7 @@ for mode, csv_file in [['train', config.TRAIN_PATH],
     data = []
     assert(csv_file.endswith('.csv'))
 
-    print(f"Evaluating {mode} set...")
+    logger.debug(f"Evaluating {mode} set...")
     # loop over CSV file rows (filename, startX, startY, endX, endY, label)
     for row in open(csv_file).read().strip().split("\n"):
         # TODO: read bounding box annotations
@@ -35,7 +36,7 @@ for mode, csv_file in [['train', config.TRAIN_PATH],
         # TODO: add bounding box annotations here
         data.append((filename, None, None, None, None, label))
 
-    print(f"Evaluating {len(data)} samples...")
+    logger.debug(f"Evaluating {len(data)} samples...")
 
     # Store all results as well as per class results
     results_labels[mode] = dict()
@@ -74,20 +75,20 @@ for mode, csv_file in [['train', config.TRAIN_PATH],
         # TODO: compute cumulated bounding box metrics
 
         if label != gt_label:
-            print(f"\tFailure at {filename}")
+            logger.debug(f"\tFailure at {filename}")
 
 
 # Compute per dataset accuracy
 for mode in ['train', 'validation', 'test']:
-    print(f'\n*** {mode} set accuracy')
-    print(f"\tMean accuracy for all labels: "
+    logger.debug(f'\n*** {mode} set accuracy')
+    logger.debug(f"\tMean accuracy for all labels: "
           f"{numpy.mean(numpy.array(results_labels[mode]['all']))}")
     # TODO: display bounding box metrics
 
     for label_str in config.LABELS:
-        print(f'\n\tMean accuracy for label {label_str}: '
+        logger.debug(f'\n\tMean accuracy for label {label_str}: '
               f'{numpy.mean(numpy.array(results_labels[mode][label_str]))}')
-        print(f'\t\t {numpy.sum(results_labels[mode][label_str])} over '
+        logger.debug(f'\t\t {numpy.sum(results_labels[mode][label_str])} over '
               f'{len(results_labels[mode][label_str])} samples')
         # TODO: display bounding box metrics
 
