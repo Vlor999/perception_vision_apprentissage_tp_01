@@ -9,9 +9,10 @@ def init_weights(m):
 
 
 class SimpleDetector(nn.Module):
-    """ VGG11 inspired feature extraction layers """
+    """VGG11 inspired feature extraction layers"""
+
     def __init__(self, nb_classes):
-        """ initialize the network """
+        """initialize the network"""
         super().__init__()
         # TODO: play with simplifications of this network
         self.features = nn.Sequential(
@@ -27,7 +28,7 @@ class SimpleDetector(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=4, stride=4),
-            nn.Flatten()
+            nn.Flatten(),
         )
         self.features.apply(init_weights)
 
@@ -42,7 +43,7 @@ class SimpleDetector(nn.Module):
             nn.Linear(32, 16),
             nn.ReLU(),
             nn.Dropout(),
-            nn.Linear(16, nb_classes)
+            nn.Linear(16, nb_classes),
         )
         self.classifier.apply(init_weights)
 
@@ -55,12 +56,14 @@ class SimpleDetector(nn.Module):
         # TODO: compute and add the bounding box regressor term
         return self.classifier(x)
 
+
 # TODO: create a new class based on SimpleDetector to create a deeper model
 
 
 # TODO: once played with VGG, play with this
 class ResnetObjectDetector(nn.Module):
-    """ Resnet18 based feature extraction layers """
+    """Resnet18 based feature extraction layers"""
+
     def __init__(self, nb_classes):
         super().__init__()
         # copy resnet up to the last conv layer prior to fc layers, and flatten
@@ -83,7 +86,7 @@ class ResnetObjectDetector(nn.Module):
             nn.Linear(512, 512),
             nn.ReLU(),
             nn.Dropout(),
-            nn.Linear(512, nb_classes)
+            nn.Linear(512, nb_classes),
         )
 
         # create regressor path for bounding box coordinates prediction

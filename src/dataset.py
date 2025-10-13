@@ -1,4 +1,4 @@
-from model import config
+from src import config
 import torch
 from torch.utils.data import Dataset
 import cv2
