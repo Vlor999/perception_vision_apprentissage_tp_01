@@ -25,11 +25,7 @@ def display_graphs(plots):
     plt.legend()
     plt.show()
 
-if __name__ == '__main__':
-    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = QLibraryInfo.location(QLibraryInfo.PluginsPath)
-
-    # initialize the list of data (images), class labels, target bounding
-    # box coordinates, and image paths
+def load_data() -> list[str]:
     print("**** loading dataset...")
     data = []
 
@@ -39,8 +35,9 @@ if __name__ == '__main__':
         # loop over CSV file rows (filename, startX, startY, endX, endY, label)
         for row in open(csv_file).read().strip().split("\n"):
             data.append(row.split(','))
+    return data
 
-    # randomly partition the data: 80% training, 10% validation, 10% testing
+def get_loaders(data: list[str]) -> tuple[DataLoader, DataLoader, DataLoader]:
     random.seed(0)
     random.shuffle(data)
 
@@ -76,57 +73,48 @@ if __name__ == '__main__':
         f.write("\n".join([','.join(row) for row in val_data]))
     with open(config.TRAIN_PATH, "w") as f:
         f.write("\n".join([','.join(row) for row in train_data]))
+    
+    return train_loader, val_loader, test_loader
 
-    # create our custom object detector model and upload to the current device
-    print("**** initializing network...")
-    object_detector = ObjectDetector(len(config.LABELS)).to(config.DEVICE)
+# function to compute loss over a batch
+def compute_loss(loader, back_prop=False):
+    # initialize the total loss and number of correct predictions
+    total_loss, correct = 0, 0
 
-    # initialize the optimizer, compile the model, and show the model summary
-    optimizer = Adam(object_detector.parameters(), lr=config.INIT_LR)
-    print(object_detector)
+    # loop over batches of the training set
+    for batch in loader:
+        # send the inputs and training annotations to the device
+        # TODO: modify line below to get bbox data
+        images, labels = [datum.to(config.DEVICE) for datum in batch]
 
-    # initialize history variables for future plot
-    plots = defaultdict(list)
+        # perform a forward pass and calculate the training loss
+        predict = object_detector(images)
 
-    # function to compute loss over a batch
-    def compute_loss(loader, back_prop=False):
-        # initialize the total loss and number of correct predictions
-        total_loss, correct = 0, 0
+        # TODO: add loss term for bounding boxes
+        bbox_loss = 0
+        class_loss = fun.cross_entropy(predict, labels, reduction="sum")
+        batch_loss = config.BBOXW * bbox_loss + config.LABELW * class_loss
 
-        # loop over batches of the training set
-        for batch in loader:
-            # send the inputs and training annotations to the device
-            # TODO: modify line below to get bbox data
-            images, labels = [datum.to(config.DEVICE) for datum in batch]
+        # zero out the gradients, perform backprop & update the weights
+        if back_prop:
+            optimizer.zero_grad()
+            batch_loss.backward()
+            optimizer.step()
 
-            # perform a forward pass and calculate the training loss
-            predict = object_detector(images)
+        # add the loss to the total training loss so far and
+        # calculate the number of correct predictions
+        total_loss += batch_loss
+        correct_labels = predict.argmax(1) == labels
+        correct += correct_labels.type(torch.float).sum().item()
 
-            # TODO: add loss term for bounding boxes
-            bbox_loss = 0
-            class_loss = fun.cross_entropy(predict, labels, reduction="sum")
-            batch_loss = config.BBOXW * bbox_loss + config.LABELW * class_loss
+    # return sample-level averages of the loss and accuracy
+    return total_loss / len(loader.dataset), correct / len(loader.dataset)
 
-            # zero out the gradients, perform backprop & update the weights
-            if back_prop:
-                optimizer.zero_grad()
-                batch_loss.backward()
-                optimizer.step()
-
-            # add the loss to the total training loss so far and
-            # calculate the number of correct predictions
-            total_loss += batch_loss
-            correct_labels = predict.argmax(1) == labels
-            correct += correct_labels.type(torch.float).sum().item()
-
-        # return sample-level averages of the loss and accuracy
-        return total_loss / len(loader.dataset), correct / len(loader.dataset)
-
+def train(plots: dict, store_model: bool = False):
     # loop over epochs
     print("**** training the network...")
     prev_val_acc = None
     prev_val_loss = None
-    start_time = time.time()
     for e in range(config.NUM_EPOCHS):
         # set model in training mode & backpropagate train loss for all batches
         object_detector.train()
@@ -156,7 +144,11 @@ if __name__ == '__main__':
         print(f"Val loss: {val_loss:.8f}, Val accuracy: {val_acc:.8f}")
 
         # TODO: write code to store model with highest accuracy, lowest loss
-        if False:
+        if prev_val_acc is None and prev_val_loss and val_acc is not None and prev_val_loss is not None:
+            prev_val_acc = val_acc
+            prev_val_loss = val_loss
+
+        if store_model and val_acc > prev_val_acc and val_loss < prev_val_loss:
             prev_val_acc = val_acc
             prev_val_loss = val_loss
 
@@ -167,10 +159,35 @@ if __name__ == '__main__':
             object_detector.eval()
             torch.save(object_detector, config.BEST_MODEL_PATH)
 
+
+if __name__ == '__main__':
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = QLibraryInfo.location(QLibraryInfo.PluginsPath)
+
+    # initialize the list of data (images), class labels, target bounding
+    # box coordinates, and image paths
+
+    data = load_data()
+
+    # randomly partition the data: 80% training, 10% validation, 10% testing
+    train_loader, val_loader, test_loader = get_loaders(data)
+
+    # create our custom object detector model and upload to the current device
+    print("**** initializing network...")
+    object_detector = ObjectDetector(len(config.LABELS)).to(config.DEVICE)
+
+    # initialize the optimizer, compile the model, and show the model summary
+    optimizer = Adam(object_detector.parameters(), lr=config.INIT_LR)
+    print(object_detector)
+
+    # initialize history variables for future plot
+    plots = defaultdict(list)
+
     print("**** saving LAST object detector model...")
     object_detector.eval()
     torch.save(object_detector, config.LAST_MODEL_PATH)
 
+    start_time = time.time()
+    train(plots)
     end_time = time.time()
     print(f"**** total time to train the model: {end_time - start_time:.2f}s")
 
