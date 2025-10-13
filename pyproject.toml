@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "matplotlib>=3.10.7",
+    "mypy>=1.18.2",
     "pyqt5>=5.15.11",
+    "ruff>=0.14.0",
     "torch>=2.8.0",
     "torchvision>=0.23.0",
 ]
