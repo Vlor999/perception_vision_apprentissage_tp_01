@@ -12,6 +12,7 @@ import time
 import os
 from loguru import logger
 from src.arguments.handle_args import setup_args
+from typing import Any
 
 from PyQt5.QtCore import QLibraryInfo
 
@@ -34,17 +35,10 @@ def optimize_for_device():
         torch.set_num_threads(num_threads)
         logger.debug(f"**** CPU optimisé avec {num_threads} threads")
 
-def display_graphs(plots):
+def display_graphs(plots, save_file: bool = True):
+    plt.style.use("ggplot")
+    plt.figure()
 
-    # loop over the plots and add each one to the figure
-    for key, values in plots.items():
-        plt.plot(values, label=key)
-
-    # add a legend and show the plot
-    plt.legend()
-    plt.show()
-
-def display_graphs_and_save(plots):
     # loop over the plots and add each one to the figure
     for key, values in plots.items():
         plt.plot(values, label=key)
@@ -52,10 +46,9 @@ def display_graphs_and_save(plots):
     # add a legend
     plt.legend()
     
-    # IMPORTANT: save the figure BEFORE showing it
-    # plt.show() clears the figure, so we must save first
-    plt.savefig(config.PLOT_PATH)
-    logger.info(f"**** plot saved to {config.PLOT_PATH}")
+    if save_file:
+        plt.savefig(config.PLOT_PATH)
+        logger.info(f"**** plot saved to {config.PLOT_PATH}")
     
     # then show the plot
     plt.show()
@@ -112,9 +105,10 @@ def get_loaders(data: list[str]) -> tuple[DataLoader, DataLoader, DataLoader]:
     return train_loader, val_loader, test_loader
 
 # function to compute loss over a batch
-def compute_loss(loader, object_detector, optimizer, back_prop=False):
+def compute_loss(loader: DataLoader, object_detector: ObjectDetector, optimizer: torch.optim.Optimizer, back_prop:bool=False) -> tuple[Any, Any]:
     # initialize the total loss and number of correct predictions
     total_loss, correct = 0, 0
+    total_samples = 0
 
     # loop over batches of the training set
     for batch in loader:
@@ -141,11 +135,13 @@ def compute_loss(loader, object_detector, optimizer, back_prop=False):
         total_loss += batch_loss
         correct_labels = predict.argmax(1) == labels
         correct += correct_labels.type(torch.float).sum().item()
-
+        
+        # Count the actual number of samples processed
+        total_samples += labels.size(0)
     # return sample-level averages of the loss and accuracy
-    return total_loss / len(loader.dataset), correct / len(loader.dataset)
+    return total_loss / total_samples, correct / total_samples
 
-def train(object_detector, optimizer, train_loader, val_loader, plots: dict, store_model: bool = False):
+def train(object_detector:ObjectDetector, optimizer:torch.optim.Optimizer, train_loader:DataLoader, val_loader:DataLoader, plots: dict[str, list[Any]], store_model: bool = False):
     # loop over epochs
     logger.debug("**** training the network...")
     prev_val_acc = None
@@ -178,23 +174,37 @@ def train(object_detector, optimizer, train_loader, val_loader, plots: dict, sto
         logger.debug(f"Train loss: {train_loss:.8f}, Train accuracy: {train_acc:.8f}")
         logger.debug(f"Val loss: {val_loss:.8f}, Val accuracy: {val_acc:.8f}")
 
-        # TODO: write code to store model with highest accuracy, lowest loss
+        # Initialize best metrics on first epoch
         if prev_val_loss is None and val_loss is not None:
             prev_val_loss = val_loss
         if prev_val_acc is None and val_acc is not None:
             prev_val_acc = val_acc
 
-        if store_model and val_acc > prev_val_acc and val_loss < prev_val_loss:
-            prev_val_acc = val_acc
-            prev_val_loss = val_loss
-
-            # serialize the model to disk
-            logger.info("**** saving BEST object detector model...")
-            # When a network has dropout and / or batchnorm layers
-            # one needs to explicitly set the eval mode before saving
-            object_detector.eval()
-            torch.save(object_detector, config.BEST_MODEL_PATH)
-        elif not store_model:
+        # Store model with best validation accuracy
+        # In case of tie, select the one with lowest loss
+        should_save_model = False
+        if store_model:
+            if val_acc > prev_val_acc:
+                # Better accuracy -> save model
+                should_save_model = True
+                logger.debug(f"New best accuracy: {val_acc:.8f} > {prev_val_acc:.8f}")
+            elif val_acc == prev_val_acc and val_loss < prev_val_loss:
+                # Same accuracy but lower loss -> save model
+                should_save_model = True
+                logger.debug(f"Same accuracy but better loss: {val_loss:.8f} < {prev_val_loss:.8f}")
+            
+            if should_save_model:
+                prev_val_acc = val_acc
+                prev_val_loss = val_loss
+                
+                # serialize the model to disk
+                logger.info("**** saving BEST object detector model...")
+                # When a network has dropout and / or batchnorm layers
+                # one needs to explicitly set the eval mode before saving
+                object_detector.eval()
+                torch.save(object_detector, config.BEST_MODEL_PATH)
+        
+        if not store_model:
             logger.debug(f"Val acc: {val_acc} - prev: {prev_val_acc}")
             logger.debug(f"Val loss: {val_loss} - prev: {prev_val_loss}")
 
@@ -214,7 +224,7 @@ def main():
     train_loader, val_loader, test_loader = get_loaders(data)
 
     # create our custom object detector model and upload to the current device
-    logger.debug("**** initializing network...")
+    logger.info("**** initializing network...")
     object_detector = ObjectDetector(len(config.LABELS)).to(config.DEVICE)
 
     # initialize the optimizer, compile the model, and show the model summary
@@ -224,21 +234,16 @@ def main():
     # initialize history variables for future plot
     plots = defaultdict(list)
 
-    logger.debug("**** saving LAST object detector model...")
+    logger.info("**** saving LAST object detector model...")
     object_detector.eval()
     torch.save(object_detector, config.LAST_MODEL_PATH)
 
     start_time = time.time()
     train(object_detector=object_detector, optimizer=optimizer, train_loader=train_loader, val_loader=val_loader, plots=plots, store_model=True)
     end_time = time.time()
-    logger.debug(f"**** total time to train the model: {end_time - start_time:.2f}s")
+    logger.info(f"**** total time to train the model: {end_time - start_time:.2f}s")
 
-    # plot the training loss and accuracy
-    plt.style.use("ggplot")
-    plt.figure()
-
-    # TODO: build and save matplotlib plot
-    display_graphs_and_save(plots)
+    display_graphs(plots, args.save_plots)
 
 
 if __name__ == '__main__':

@@ -15,7 +15,7 @@ if len(sys.argv) < 2:
 model_path = sys.argv[1]
 
 logger.debug(f"**** loading object detector at {model_path}...")
-model = torch.load(model_path).to(config.DEVICE)
+model = torch.load(model_path, weights_only=False).to(config.DEVICE)
 model.eval()
 logger.debug(f"**** object detector loaded")
 
@@ -80,13 +80,13 @@ for mode, csv_file in [['train', config.TRAIN_PATH],
 
 # Compute per dataset accuracy
 for mode in ['train', 'validation', 'test']:
-    logger.debug(f'\n*** {mode} set accuracy')
-    logger.debug(f"\tMean accuracy for all labels: "
+    logger.info(f'*** {mode} set accuracy')
+    logger.info(f"Mean accuracy for all labels: "
           f"{numpy.mean(numpy.array(results_labels[mode]['all']))}")
     # TODO: display bounding box metrics
 
     for label_str in config.LABELS:
-        logger.debug(f'\n\tMean accuracy for label {label_str}: '
+        logger.debug(f'\tMean accuracy for label {label_str}: '
               f'{numpy.mean(numpy.array(results_labels[mode][label_str]))}')
         logger.debug(f'\t\t {numpy.sum(results_labels[mode][label_str])} over '
               f'{len(results_labels[mode][label_str])} samples')
