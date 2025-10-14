@@ -39,6 +39,8 @@ if DEVICE == "mps":
     BATCH_SIZE = 16  # Réduit de 32 à 16 pour MPS
 else:
     NB_WORKERS = os.cpu_count() if DEVICE in ["cuda", "mps"] else 2
+    if NB_WORKERS is None:
+        NB_WORKERS = 2
     BATCH_SIZE = 32
 
 logger.debug("**** using", DEVICE.upper(), "and", NB_WORKERS, "workers")
@@ -46,7 +48,7 @@ logger.debug("**** using", DEVICE.upper(), "and", NB_WORKERS, "workers")
 # initialize our initial learning rate, number of epochs to train
 # for, and the batch size
 INIT_LR = 1e-4
-NUM_EPOCHS = 20
+NUM_EPOCHS = 50
 
 # specify the loss weights
 LABELW = 1.0
