@@ -8,11 +8,11 @@ from torch.optim import Adam
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import random
-import time
 import os
 from loguru import logger
 from src.arguments.handle_args import setup_args
 from typing import Any
+from src.timer.timer import Timer
 
 from PyQt5.QtCore import QLibraryInfo
 
@@ -238,10 +238,9 @@ def main():
     object_detector.eval()
     torch.save(object_detector, config.LAST_MODEL_PATH)
 
-    start_time = time.time()
-    train(object_detector=object_detector, optimizer=optimizer, train_loader=train_loader, val_loader=val_loader, plots=plots, store_model=True)
-    end_time = time.time()
-    logger.info(f"**** total time to train the model: {end_time - start_time:.2f}s")
+    with Timer():
+        train(object_detector=object_detector, optimizer=optimizer, train_loader=train_loader, val_loader=val_loader, plots=plots, store_model=True)
+
 
     display_graphs(plots, args.save_plots)
 
