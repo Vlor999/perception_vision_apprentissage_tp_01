@@ -16,4 +16,4 @@ web_images/
 
 # pth files
 *.pth
-.DS_Store
+.DS_Storeoutput/*.pth
