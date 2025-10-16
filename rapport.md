@@ -241,6 +241,16 @@ this error makes sens since there is multiple face on the ams image wich is not 
    
    The feature extraction layers are simply copied, and we just replace
    the Fully Connected (Linear) layers with our own blocs. Train, evaluate and comment.
+
+   * Even with a small number of epoch the model is really efficient : 
+      * Comand line :
+         ```bash
+            uv run python train.py --model resnet --save-model true --epoch-size 10 && uv run python eval.py output/best_model.pth
+         ```
+      * For 10-20 epochs:
+         * Train set accuracy: 100%
+         * Test set accuracy: 100%
+         * Validation set accuracy: 100%  
    
 4. Compare the 4 different models (SimpleModel, DeepModel, VGG-like, Resnet)
    by making a table of loss and accuracy by model.

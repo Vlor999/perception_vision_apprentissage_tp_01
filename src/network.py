@@ -1,4 +1,5 @@
-from torch import nn
+import torchvision
+import torch.nn as nn
 from torchvision.models import resnet18
 
 
@@ -227,7 +228,7 @@ class ResnetObjectDetector(nn.Module):
         super().__init__()
         # copy resnet up to the last conv layer prior to fc layers, and flatten
         # TODO: add pretrained=True to get pretrained coefficients: what effect?
-        features = list(resnet18(pretrained=True).children())[:9]
+        features = list(resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT).children())[:9]
         self.features = nn.Sequential(*features, nn.Flatten())
 
         # TODO: first freeze these layers, then comment this loop to
