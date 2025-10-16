@@ -30,8 +30,8 @@ def setup_args() -> argparse.Namespace:
         "--model",
         type=str,
         default="simple",
-        choices=["simple", "deeper", "vgg_inspired", "resnet"],
-        help="Choose the model architecture: simple (SimpleDetector), deeper (DeeperDetector), vgg_inspired (VGGInspired), or resnet (ResnetObjectDetector)",
+        choices=["simple", "deeper", "vgg_inspired", "resnet", "resnet_unfrozen"],
+        help="Choose the model architecture: simple (SimpleDetector), deeper (DeeperDetector), vgg_inspired (VGGInspired), resnet (ResnetObjectDetector frozen), or resnet_unfrozen (ResnetObjectDetector unfrozen)",
     )
 
     args = parser.parse_args()
@@ -66,12 +66,19 @@ def setup_args() -> argparse.Namespace:
 def setup_args_prediction() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Argument for the prediction file")
 
-    parser.add_argument(
-        "--filename",
+    group = parser.add_mutually_exclusive_group(required=True)
+
+    group.add_argument(
+        "--directory",
         type=str,
         default=None,
         help="Specify a file to analyse",
-        required=True,
+    )
+    group.add_argument(
+        "--filename",
+        type=str,
+        default=None,
+        help="Selected a specific file to test for type and bounding box"
     )
     parser.add_argument(
         "--show-all-images",
@@ -80,9 +87,33 @@ def setup_args_prediction() -> argparse.Namespace:
         choices=["true", "false"],
         help="Display all images or only the wrong one (true/false)",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        choices=["best", "last"],
+        default="best",
+        help="choose between the last model saved and the best model"
+    )
+
+    parser.add_argument(
+        "--save-file",
+        type=str,
+        default="false",
+        choices=['true', 'false'],
+        help="If you are using one test file you can save the file or not"
+    )
+
+    parser.add_argument(
+        "--output-file",
+        type=str,
+        default=None,
+        help="You must give an output filename if you want to save the file"
+    )
 
     args = parser.parse_args()
 
     args.show_all_images = True if args.show_all_images == "true" else "false"
+    args.model = config.BEST_MODEL_PATH if args.model == "best" else config.LAST_MODEL_PATH
+    args.save_file = True if args.save_file == 'true' else False
 
     return args

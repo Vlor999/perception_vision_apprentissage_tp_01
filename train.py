@@ -29,7 +29,9 @@ def get_model(model_name: str, nb_classes: int) -> ObjectDetector:
     elif model_name == "vgg_inspired":
         return VGGInspired(nb_classes)
     elif model_name == "resnet":
-        return ResnetObjectDetector(nb_classes)
+        return ResnetObjectDetector(nb_classes, freeze_features=True)
+    elif model_name == "resnet_unfrozen":
+        return ResnetObjectDetector(nb_classes, freeze_features=False)
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -138,15 +140,13 @@ def compute_loss(loader: DataLoader, object_detector: torch.nn.Module, optimizer
     # loop over batches of the training set
     for batch in loader:
         # send the inputs and training annotations to the device
-        # TODO: modify line below to get bbox data
-        images, labels = [datum.to(config.DEVICE) for datum in batch]
+        images, labels, bbox = [datum.to(config.DEVICE) for datum in batch]
 
         # perform a forward pass and calculate the training loss
-        predict = object_detector(images)
+        class_pred, bbox_pred = object_detector(images)
 
-        # TODO: add loss term for bounding boxes
-        bbox_loss = 0
-        class_loss = fun.cross_entropy(predict, labels, reduction="sum")
+        bbox_loss = fun.mse_loss(bbox_pred, bbox, reduction="sum")
+        class_loss = fun.cross_entropy(class_pred, labels, reduction="sum")
         batch_loss = config.BBOXW * bbox_loss + config.LABELW * class_loss
 
         # zero out the gradients, perform backprop & update the weights
@@ -158,7 +158,7 @@ def compute_loss(loader: DataLoader, object_detector: torch.nn.Module, optimizer
         # add the loss to the total training loss so far and
         # calculate the number of correct predictions
         total_loss += batch_loss
-        correct_labels = predict.argmax(1) == labels
+        correct_labels = class_pred.argmax(1) == labels
         correct += correct_labels.type(torch.float).sum().item()
         
         # Count the actual number of samples processed
