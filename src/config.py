@@ -47,7 +47,7 @@ logger.debug(f"**** using {DEVICE.upper()} and {NB_WORKERS} workers")
 # initialize our initial learning rate, number of epochs to train
 # for, and the batch size
 INIT_LR = 1e-4
-NUM_EPOCHS = 50
+NUM_EPOCHS = 20
 
 # specify the loss weights
 LABELW = 1.0
