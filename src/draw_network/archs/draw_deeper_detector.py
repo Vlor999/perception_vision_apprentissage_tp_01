@@ -40,7 +40,6 @@ arch = [
         width=3,
         caption="Conv1\\_2\\\\32 to 32",
     ),
-    to_connection("conv1_1", "conv1_2"),
     to_Pool(
         "pool1",
         offset="(0,0,0)",
@@ -75,7 +74,6 @@ arch = [
         width=5,
         caption="Conv2\\_2\\\\64 to 64",
     ),
-    to_connection("conv2_1", "conv2_2"),
     to_Pool(
         "pool2",
         offset="(0,0,0)",
@@ -110,7 +108,6 @@ arch = [
         width=8,
         caption="Conv3\\_2\\\\128 to 128",
     ),
-    to_connection("conv3_1", "conv3_2"),
     to_Pool(
         "pool3",
         offset="(0,0,0)",
@@ -145,7 +142,6 @@ arch = [
         width=10,
         caption="Conv4\\_2\\\\256 to 256",
     ),
-    to_connection("conv4_1", "conv4_2"),
     # Block 5: 7x7  to  7x7 (1x1 conv + 3x3 conv)
     to_Conv(
         "conv5_1",
@@ -170,7 +166,6 @@ arch = [
         width=12,
         caption="Conv5\\_2\\\\512 to 512",
     ),
-    to_connection("conv5_1", "conv5_2"),
     # Flatten
     to_Conv(
         "flatten",
