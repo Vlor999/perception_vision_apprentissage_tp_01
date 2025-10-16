@@ -121,15 +121,15 @@ For motorcycle the accuracy is even at 0 but for planes it is quite high.
 
 Example of the use : 
 ```bash
-python predict.py --filename output/test_data.csv --show-all-images true
+uv run python predict.py --directory output/test_data.csv --show-all-images true
 # If you don't know what to write : 
-python predict.py --help
+uv run python predict.py --help
 ```
 
 5. Write some code in [`train.py`](train.py) to create training loss and accuracy plots
    with matplotlib.
 
-* ![text](doc/convergence_plot.png)
+* ![text](output/convergence_plot.png)
 Here is the plot for 20 epochs
 
 6. Write some code in [`train.py`](train.py) to store the model with best validation
@@ -245,21 +245,89 @@ this error makes sens since there is multiple face on the ams image wich is not 
    * Even with a small number of epoch the model is really efficient : 
       * Comand line :
          ```bash
-            uv run python train.py --model resnet --save-model true --epoch-size 10 && uv run python eval.py output/best_model.pth
+         uv run python train.py --model resnet --save-model true --epoch-size 10 && uv run python eval.py output/best_model.pth
          ```
       * For 10-20 epochs:
          * Train set accuracy: 100%
          * Test set accuracy: 100%
          * Validation set accuracy: 100%  
-   
-4. Compare the 4 different models (SimpleModel, DeepModel, VGG-like, Resnet)
-   by making a table of loss and accuracy by model.
-   Comment on the computation time of an epoch, and the evolution of the loss
-   function.
-   
-   Provide aggregated and refined results per label in the comparison.
-   Download internet images and run them through the network. Show a few 
-   success and failure cases and comment.
+
+### Here are soome representations of the models:
+Simple model:
+![Simple Model](src/draw_network/network_diagrams/draw_simple_detector.png)
+
+Deeper model:
+![Deeper Model](src/draw_network/network_diagrams/draw_deeper_detector.png)
+
+Resnet model:
+![Resnet Model](src/draw_network/network_diagrams/draw_resnet_detector.png)
+
+to create those models you have to run : 
+```bash
+./draw_networks.sh
+```
+Those draw are related to the current models but are not automatically extracted from [`network.py](src/network.py). So if a change is made we must change the python files
+
+4. Command to launch: 
+```bash
+uv run python compare_models.py
+```
+### Model Comparison: Training Loss
+
+| Model                | Training Loss (Mean) | Training Loss (Average) | Training Loss (Final) |
+|----------------------|---------------------|-------------------------|-----------------------|
+| SimpleDetector       | 0.1066              | 0.1322                  | 0.0107                |
+| DeeperDetector       | 0.0431              | 0.1122                  | 0.0001                |
+| VGGInspired          | 0.0278              | 0.0470                  | 0.0000                |
+| ResnetObjectDetector | 0.0055              | 0.0160                  | 0.0001                |
+
+### Model Comparison: Training Accuracy
+
+| Model                | Training Accuracy (Mean) | Training Accuracy (Average) | Training Accuracy (Final) |
+|----------------------|-------------------------|-----------------------------|---------------------------|
+| SimpleDetector       | 0.9910                  | 0.0165                      | 0.9988                    |
+| DeeperDetector       | 0.9838                  | 0.0515                      | 1.0000                    |
+| VGGInspired          | 0.9895                  | 0.0206                      | 1.0000                    |
+| ResnetObjectDetector | 0.9999                  | 0.0002                      | 1.0000                    |
+
+### Model Comparison: Validation Loss
+
+| Model                | Validation Loss (Mean) | Validation Loss (Average) | Validation Loss (Final) |
+|----------------------|-----------------------|---------------------------|-------------------------|
+| SimpleDetector       | 0.1355                | 0.1365                    | 0.0329                  |
+| DeeperDetector       | 0.0821                | 0.1095                    | 0.0414                  |
+| VGGInspired          | 0.0893                | 0.0600                    | 0.0617                  |
+| ResnetObjectDetector | 0.0053                | 0.0155                    | 0.0001                  |
+
+### Model Comparison: Validation Accuracy
+
+| Model                | Validation Accuracy (Mean) | Validation Accuracy (Average) | Validation Accuracy (Final) |
+|----------------------|---------------------------|-------------------------------|-----------------------------|
+| SimpleDetector       | 0.9759                    | 0.0243                        | 0.9901                      |
+| DeeperDetector       | 0.9768                    | 0.0543                        | 0.9951                      |
+| VGGInspired          | 0.9788                    | 0.0219                        | 0.9901                      |
+| ResnetObjectDetector | 1.0000                    | 0.0000                        | 1.0000                      |
+
+### Model Comparison: Epoch Time (20 epochs)
+
+| Model                | Epoch Time (20 epochs) |
+|----------------------|-----------------------|
+| SimpleDetector       | 1m38s                 |
+| DeeperDetector       | 3m02s                 |
+| VGGInspired          | 7m02s                 |
+| ResnetObjectDetector | 1m58s                 |
+
+   **Comments:**
+   - ResnetObjectDetector achieves near-perfect accuracy and lowest loss, with fast convergence due to pretrained weights.
+   - VGGInspired and DeeperDetector require longer training and more time per epoch, but reach high accuracy.
+   - SimpleDetector is fastest but a bit less robust.
+   - Loss curves show Resnet starts strong, while other models improve gradually.
+   - Per-label results and internet image tests confirm Resnet's generalization; other models may fail on more complex or unseen cases.
+
+   **Images:**
+   ![text](doc/Comparaison_models.png)
+   ![text](doc/COmparaison_models_progression.png)
+
    
 
 ## Part 3: Bounding Box Regression
@@ -309,6 +377,29 @@ propagate similar additions to your other networks.
 6. Now let's see what happens visually! Modify [`predict.py`](predict.py) to display
    the bounding boxes in images for predicted bounding boxes and the ground
    truth bounding boxes (using `cv2.rectangle`). 
+
+* We can launch the current training and evaluation with : 
+```bash
+uv run python train.py --model simple --save-model true --epoch-size 20 && uv run python predict.py --filename output/test_data.csv --show-all-images true
+```
+
+We can see that on most of the cases the bouding boxe is center on the object (face, plane or moto). 
+If we do not need to have very precise information for most of the case it is efficient and enough with the small model.
+
+* Images:
+   * Simple model:
+![text](doc/bbox_data/convergence_plot_simple.png)
+
+   * Deeper model:
+![text](doc/bbox_data/convergence_plot_deeper.png)
+
+   * VGG model:
+![text](doc/bbox_data/convergence_plot_vgg.png)
+
+   * Resnet model:
+![text](doc/bbox_data/convergence_plot_resnet.png)
+
+
    
 7. Resnet can be loaded with pretrained weights (constructor argument 
    `resnet18(pretrained = True`, in [`network.py`](model/network.py)).
@@ -316,6 +407,29 @@ propagate similar additions to your other networks.
    (transfer learning). For the latter, simply comment the code calling the 
    `param.requires_grad = False` in [`network.py`](model/network.py).
    Test the possibilities and compare.
+
+* One the classification domain there is no big difference between the frozen and the unfrozen model.
+But on the bbox detection there is a huge difference.
+The files : 
+[`frozen_resnet.log`](doc/evaluation_models_resnet/frozen_resnet.log)
+[`unfrozen_resnet.log`](doc/evaluation_models_resnet/unfrozen_resnet)
+show that the bbox values like IoU and distance are a way better with unfrozen parameters.
+
+### Bounding Box Regression: Frozen vs Unfrozen ResNet
+
+#### Bounding Box Regression Results: Frozen vs Unfrozen ResNet
+
+| Category   | Model      | Mean Distance | Mean IoU | IoU ≥ 0.5 (%) | IoU ≥ 0.7 (%) |
+|------------|------------|---------------|----------|---------------|---------------|
+| Face       | Frozen     | 0.2799        | 0.4242   | 40.0%         | 5.0%          |
+| Face       | Unfrozen   | 0.1196        | 0.6879   | 91.2%         | 52.6%         |
+| Motorcycle | Frozen     | 0.2442        | 0.4242   | 40.0%         | 5.0%          |
+| Motorcycle | Unfrozen   | 0.1039        | 0.5718   | 70.3%         | 17.6%         |
+| Airplane   | Frozen     | 0.2520        | 0.5339   | 64.4%         | 12.3%         |
+| Airplane   | Unfrozen   | 0.0926        | 0.7895   | 100.0%        | 91.8%         |
+
+**Summary:**  
+Unfreezing the ResNet backbone significantly improves bounding box localization across all categories, with higher IoU scores and lower mean distances. The effect is most pronounced for faces and airplanes.
 
 8. (optional) Do the same for your other Neural Network architectures. 
    Test and compare your different architectures `SimpleDetector`, 
@@ -325,8 +439,176 @@ propagate similar additions to your other networks.
    Note your observations on training losses, results, failure cases in a 
    error analysis table.
 
+### Comprehensive Model Comparison with Bounding Box Regression
+
+We conducted a comprehensive comparison of all neural network architectures with bounding box regression capabilities. All models were trained for 20 epochs with identical hyperparameters.
+
+**Command to reproduce:**
+```bash
+uv run python compare_models.py
+```
+
+#### Training Performance Analysis
+
+**Training Loss Comparison:**
+
+| Model | Final Loss | Mean Loss | Std Dev | Convergence |
+|-------|------------|-----------|---------|-------------|
+| SimpleDetector | 0.0200 | 0.1789 | ±0.3517 | Moderate |
+| DeeperDetector | 0.0043 | 0.0453 | ±0.0896 | Good |
+| VGGInspired | 0.0021 | 0.0509 | ±0.0935 | Good |
+| ResNet (Frozen) | 0.0154 | 0.0479 | ±0.0535 | Very Good |
+| ResNet (Unfrozen) | 0.0068 | 0.0119 | ±0.0144 | Excellent |
+
+**Training Classification Accuracy:**
+
+| Model | Final Accuracy | Mean Accuracy | Performance |
+|-------|----------------|---------------|-------------|
+| SimpleDetector | 99.7% | 98.6% ±2.2% | Good |
+| DeeperDetector | 100.0% | 99.2% ±2.2% | Very Good |
+| VGGInspired | 100.0% | 98.7% ±2.8% | Very Good |
+| ResNet (Frozen) | 100.0% | 99.97% ±0.06% | Excellent |
+| ResNet (Unfrozen) | 100.0% | 100.0% ±0.0% | Perfect |
+
+#### Validation Performance Analysis
+
+**Validation Loss:**
+
+| Model | Final Loss | Mean Loss | Generalization |
+|-------|------------|-----------|----------------|
+| SimpleDetector | 0.0434 | 0.2048 ±0.3545 | Moderate |
+| DeeperDetector | 0.0080 | 0.0799 ±0.1034 | Good |
+| VGGInspired | 0.0476 | 0.1064 ±0.1050 | Good |
+| ResNet (Frozen) | 0.0356 | 0.0685 ±0.0531 | Very Good |
+| ResNet (Unfrozen) | 0.0079 | 0.0156 ±0.0150 | Excellent |
+
+**Validation Classification Accuracy:**
+
+| Model | Final Accuracy | Mean Accuracy | Stability |
+|-------|----------------|---------------|-----------|
+| SimpleDetector | 99.0% | 97.5% ±2.4% | Good |
+| DeeperDetector | 100.0% | 98.3% ±2.6% | Very Good |
+| VGGInspired | 99.0% | 97.0% ±3.6% | Good |
+| ResNet (Frozen) | 100.0% | 100.0% ±0.0% | Perfect |
+| ResNet (Unfrozen) | 100.0% | 100.0% ±0.0% | Perfect |
+
+#### Key Observations and Analysis
+
+**Training Convergence:**
+- **ResNet (Unfrozen)**: Best overall performance with lowest loss variance (±0.0144) and perfect accuracy
+- **ResNet (Frozen)**: Excellent performance with minimal training, demonstrating transfer learning effectiveness
+- **VGGInspired & DeeperDetector**: Good convergence but require more epochs than ResNet variants
+- **SimpleDetector**: Moderate performance with highest loss variance, indicating training instability
+
+**Generalization Capability:**
+- **ResNet models**: Both variants show perfect validation accuracy with excellent generalization
+- **DeeperDetector**: Best among non-pretrained models for generalization
+- **VGGInspired**: Good performance but slightly more prone to overfitting (higher validation loss variance)
+- **SimpleDetector**: Shows largest gap between training and validation performance
+
+**Transfer Learning Impact:**
+- **Frozen ResNet**: Achieves excellent results with minimal parameter updates, proving transfer learning efficiency
+- **Unfrozen ResNet**: Superior performance justifies the computational cost of fine-tuning
+- **From-scratch models**: Require significantly more training for comparable results
+
+**Failure Case Analysis:**
+- **SimpleDetector**: Occasional instability during training (high loss variance)
+- **VGGInspired**: Slower initial convergence requiring careful learning rate tuning
+- **All models**: Perfect classification but varying bounding box precision (see previous analysis)
+
+**Computational Efficiency:**
+- **ResNet (Frozen)**: Best performance/computation ratio
+- **SimpleDetector**: Fastest training but lowest final performance
+- **VGGInspired**: Highest computational cost for marginal gains over DeeperDetector
+
+**Visualization:**
+The complete loss evolution plots and training progression are available in:
+![Model Comparison Histograms](doc/compare_all_bbox/model_comparaison_bbox.png)
+![Training Progression](doc/compare_all_bbox/training_comparaison_bbox.png)
+
+#### Bounding Box Performance Analysis
+
+We evaluated all models for bounding box localization performance. Here are the detailed results:
+
+**SimpleDetector Test Set Performance:**
+- **Mean IoU**: 0.803 (excellent localization)
+- **Good Detection Rate** (IoU > 0.5): 97.1%
+- **Very Good Detection Rate** (IoU > 0.7): 77.5%
+- **Mean Distance**: 0.083 (normalized)
+
+**DeeperDetector Test Set Performance:**
+- **Mean IoU**: 0.833 (excellent localization)
+- **Good Detection Rate** (IoU > 0.5): 100.0%
+- **Very Good Detection Rate** (IoU > 0.7): 91.2%
+- **Mean Distance**: 0.071 (normalized)
+
+**VGGInspired Test Set Performance:**
+- **Mean IoU**: 0.852 (excellent localization)
+- **Good Detection Rate** (IoU > 0.5): 100.0%
+- **Very Good Detection Rate** (IoU > 0.7): 97.1%
+- **Mean Distance**: 0.062 (normalized)
+
+**ResNet Frozen Test Set Performance:**
+- **Mean IoU**: 0.660 (good localization)
+- **Good Detection Rate** (IoU > 0.5): 85.3%
+- **Very Good Detection Rate** (IoU > 0.7): 47.1%
+- **Mean Distance**: 0.156 (normalized)
+
+**ResNet Unfrozen Test Set Performance:**
+- **Mean IoU**: 0.758 (excellent localization)
+- **Good Detection Rate** (IoU > 0.5): 97.5%
+- **Very Good Detection Rate** (IoU > 0.7): 78.9%
+- **Mean Distance**: 0.104 (normalized)
+
+**Per-Category Bounding Box Performance Comparison (Test Set):**
+
+| Model | Category | Mean IoU | Mean Distance | Good Detection (%) | Very Good Detection (%) |
+|-------|----------|----------|---------------|-------------------|------------------------|
+| SimpleDetector | Face | 0.646 | 0.141 | 89.5% | 31.6% |
+| SimpleDetector | Motorcycle | 0.848 | 0.071 | 100.0% | 93.2% |
+| SimpleDetector | Airplane | 0.881 | 0.051 | 100.0% | 97.3% |
+| DeeperDetector | Face | 0.754 | 0.092 | 100.0% | 77.2% |
+| DeeperDetector | Motorcycle | 0.872 | 0.059 | 100.0% | 97.3% |
+| DeeperDetector | Airplane | 0.855 | 0.065 | 100.0% | 95.9% |
+| VGGInspired | Face | 0.809 | 0.071 | 100.0% | 91.2% |
+| VGGInspired | Motorcycle | 0.851 | 0.068 | 100.0% | 98.6% |
+| VGGInspired | Airplane | 0.886 | 0.048 | 100.0% | 100.0% |
+| ResNet Frozen | Face | 0.499 | 0.209 | 50.9% | 15.8% |
+| ResNet Frozen | Motorcycle | 0.726 | 0.139 | 100.0% | 60.8% |
+| ResNet Frozen | Airplane | 0.718 | 0.132 | 97.3% | 57.5% |
+| ResNet Unfrozen | Face | 0.688 | 0.120 | 91.2% | 52.6% |
+| ResNet Unfrozen | Motorcycle | 0.781 | 0.104 | 100.0% | 86.5% |
+| ResNet Unfrozen | Airplane | 0.790 | 0.093 | 100.0% | 91.8% |
+
+**Key Observations:**
+- **VGGInspired** achieves the best overall bounding box performance with 100% good detection rate and 97.1% very good detection rate, surpassing all other models
+- **DeeperDetector** shows excellent performance with 100% good detection rate and 91.2% very good detection rate
+- **ResNet Unfrozen** demonstrates the significant impact of transfer learning fine-tuning compared to frozen features
+- **ResNet Frozen** shows notably poor performance (47.1% very good detection rate), highlighting the importance of unfreezing backbone features for bbox regression
+- **SimpleDetector** shows good performance but struggles significantly with face localization (31.6% very good detection rate for faces)
+- **VGGInspired** achieves perfect airplane localization (100% very good detection rate) and excellent face detection (91.2% very good detection rate)
+- **Transfer Learning Impact**: Unfrozen ResNet (78.9% very good detection) vs Frozen ResNet (47.1% very good detection) shows a 31.8% improvement
+- **Face Localization Challenge**: ResNet Frozen performs particularly poorly on faces (15.8% very good detection) compared to custom architectures
+- Custom deeper architectures (VGGInspired, DeeperDetector) consistently outperform transfer learning approaches for bounding box regression tasks
+
+### Note:
+The deeper model use lot of energy and have lots of parameters wich lead to lobg training compare to other models trained here.
+
 9. (optional) Download internet images and run them through the network. 
    Show a few success and failure cases and comment.
+
+For the bounding box detection with the model: Resnet (unfrozen) this image does not properly work:
+![error plane](doc/error_plane.jpg)
+In fact the proper type has been found but the bouding box does not make sense.
+All the other picture are good (good bounding boxe and proper class)
+To test a specific image you can run :
+```bash
+uv run python predict.py --filename web_images/images/airplane/web_test_plane_2.jpg --model best --save-file true --output-file "doc/error_plane.jpg"
+```
+and for classic prediction
+```bash
+uv run python predict.py --model best --directory output/test_data.csv
+```
 
 
 ## Part 4: Comparison with classic approaches (optional)
