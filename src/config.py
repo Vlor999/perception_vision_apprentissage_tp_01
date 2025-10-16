@@ -35,8 +35,7 @@ PIN_MEMORY = True if DEVICE == "cuda" else False
 if DEVICE == "mps":
     # Réduire le nombre de workers pour éviter les conflits de mémoire sur MPS
     NB_WORKERS = 0  # 0 pour MPS évite les problèmes de multiprocessing
-    # Réduire la batch size pour économiser la mémoire GPU
-    BATCH_SIZE = 32  # Réduit de 32 à 16 pour MPS
+    BATCH_SIZE = 16
 else:
     NB_WORKERS = os.cpu_count() if DEVICE in ["cuda", "mps"] else 2
     if NB_WORKERS is None:
@@ -48,7 +47,7 @@ logger.debug(f"**** using {DEVICE.upper()} and {NB_WORKERS} workers")
 # initialize our initial learning rate, number of epochs to train
 # for, and the batch size
 INIT_LR = 1e-4
-NUM_EPOCHS = 10
+NUM_EPOCHS = 50
 
 # specify the loss weights
 LABELW = 1.0
