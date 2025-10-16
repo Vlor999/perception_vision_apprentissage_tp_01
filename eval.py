@@ -25,16 +25,17 @@ for mode, csv_file in [['train', config.TRAIN_PATH],
                        ['validation', config.VAL_PATH],
                        ['test', config.TEST_PATH],]:
     data = []
+    print(csv_file)
     assert(csv_file.endswith('.csv'))
 
     logger.debug(f"Evaluating {mode} set...")
     # loop over CSV file rows (filename, startX, startY, endX, endY, label)
     for row in open(csv_file).read().strip().split("\n"):
         # TODO: read bounding box annotations
-        filename, _, _, _, _, label = row.split(',')
+        filename, startX, startY, endX, endY, label = row.split(',')
         filename = os.path.join(config.IMAGES_PATH, label, filename)
         # TODO: add bounding box annotations here
-        data.append((filename, None, None, None, None, label))
+        data.append((filename, startX, startY, endX, endY, label))
 
     logger.debug(f"Evaluating {len(data)} samples...")
 
@@ -50,6 +51,12 @@ for mode, csv_file in [['train', config.TRAIN_PATH],
         # load the image, copy it, swap its colors channels, resize it, and
         # bring its channel dimension forward
         image = cv2.imread(filename)
+        
+        # Check if image was loaded successfully
+        if image is None:
+            logger.warning(f"Could not load image: {filename}. Skipping...")
+            continue
+            
         display = image.copy()
         h, w = display.shape[:2]
 

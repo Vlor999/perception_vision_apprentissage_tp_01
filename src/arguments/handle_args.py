@@ -4,26 +4,47 @@ from loguru import logger
 
 
 def setup_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Entraînement optimisé pour macOS")
+    parser = argparse.ArgumentParser(description="Setup argument")
+
     parser.add_argument(
-        "--cpu-only", action="store_true", help="Forcer l'utilisation du CPU uniquement"
+        "--cpu-only", action="store_true", help="Force the usage of CPU over any GPU"
+    )
+    parser.add_argument("--epoch-size", type=int, default=None, help="Number of epoch")
+    parser.add_argument("--batch-size", type=int, default=None, help="Number of batch")
+    parser.add_argument("--workers", type=int, default=None, help="Number of workers")
+    parser.add_argument(
+        "--save-plots",
+        type=str,
+        default="true",
+        choices=["true", "false"],
+        help="Display the plots (true/false)",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=None, help="Taille de batch personnalisée"
+        "--save-model",
+        type=str,
+        default="true",
+        choices=["true", "false"],
+        help="Save the current model (true/false)",
     )
     parser.add_argument(
-        "--workers", type=int, default=None, help="Nombre de workers personnalisé"
-    )
-    parser.add_argument(
-        "--save-plots", type=str, default=True, help="Say if you save the plots or not"
+        "--model",
+        type=str,
+        default="simple",
+        choices=["simple", "deeper", "vgg_inspired", "resnet"],
+        help="Choose the model architecture: simple (SimpleDetector), deeper (DeeperDetector), vgg_inspired (VGGInspired), or resnet (ResnetObjectDetector)",
     )
 
     args = parser.parse_args()
-    # Forcer CPU si demandé
+    # Using CPU if asked
     if args.cpu_only:
         config.DEVICE = "cpu"
         config.PIN_MEMORY = False
         logger.info("**** Mode CPU forcé")
+
+    # Override the epoch size
+    if args.epoch_size:
+        config.NUM_EPOCHS = args.epoch_size
+        logger.info(f"**** Batch size modifiée: {config.NUM_EPOCHS}")
 
     # Override batch size si spécifié
     if args.batch_size:
@@ -35,21 +56,16 @@ def setup_args() -> argparse.Namespace:
         config.NB_WORKERS = args.workers
         logger.info(f"**** Workers modifiés: {config.NB_WORKERS}")
 
-        # Convert string to boolean properly
-    if args.save_plots.lower() in ["true", "1", "yes", "on"]:
-        args.save_plots = True
-    elif args.save_plots.lower() in ["false", "0", "no", "off"]:
-        args.save_plots = False
-    else:
-        raise ValueError(
-            f"Invalid value for --save-plots: {args.save_plots}. Use true/false."
-        )
+    # Convert string to boolean properly
+    args.save_plots = True if args.save_plots == "true" else False
+    args.save_model = True if args.save_model == "true" else False
 
     return args
 
 
 def setup_args_prediction() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Argument for the prediction file")
+
     parser.add_argument(
         "--filename",
         type=str,
@@ -61,19 +77,12 @@ def setup_args_prediction() -> argparse.Namespace:
         "--show-all-images",
         type=str,
         default="true",
+        choices=["true", "false"],
         help="Display all images or only the wrong one (true/false)",
     )
 
     args = parser.parse_args()
 
-    # Convert string to boolean properly
-    if args.show_all_images.lower() in ["true", "1", "yes", "on"]:
-        args.show_all_images = True
-    elif args.show_all_images.lower() in ["false", "0", "no", "off"]:
-        args.show_all_images = False
-    else:
-        raise ValueError(
-            f"Invalid value for --show-all-images: {args.show_all_images}. Use true/false."
-        )
+    args.show_all_images = True if args.show_all_images == "true" else "false"
 
     return args

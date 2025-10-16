@@ -1,5 +1,5 @@
 from src.dataset import ImageDataset
-from src.network import SimpleDetector as ObjectDetector
+from src.network import SimpleDetector, DeeperDetector, VGGInspired, ResnetObjectDetector
 from src import config
 import torch
 from torch.utils.data import DataLoader
@@ -15,6 +15,23 @@ from typing import Any
 from src.timer.timer import Timer
 
 from PyQt5.QtCore import QLibraryInfo
+
+# Union type for all detector classes
+from typing import Union
+ObjectDetector = Union[SimpleDetector, DeeperDetector, VGGInspired, ResnetObjectDetector]
+
+def get_model(model_name: str, nb_classes: int) -> ObjectDetector:
+    """Factory function to create model based on command line argument"""
+    if model_name == "simple":
+        return SimpleDetector(nb_classes)
+    elif model_name == "deeper":
+        return DeeperDetector(nb_classes)
+    elif model_name == "vgg_inspired":
+        return VGGInspired(nb_classes)
+    elif model_name == "resnet":
+        return ResnetObjectDetector(nb_classes)
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
 
 # Optimisations pour macOS
 def optimize_for_device():
@@ -40,8 +57,16 @@ def display_graphs(plots, save_file: bool = True):
     plt.figure()
 
     # loop over the plots and add each one to the figure
+    number_plots = len(plots)
+    num_row = int(number_plots ** (1/2))
+    num_col = int(number_plots / num_row) if num_row > 0 else 1
+    count = 1
+
     for key, values in plots.items():
+        plt.subplot(num_row, num_col, count)
         plt.plot(values, label=key)
+        plt.title(key)
+        count += 1
 
     # add a legend
     plt.legend()
@@ -105,7 +130,7 @@ def get_loaders(data: list[str]) -> tuple[DataLoader, DataLoader, DataLoader]:
     return train_loader, val_loader, test_loader
 
 # function to compute loss over a batch
-def compute_loss(loader: DataLoader, object_detector: ObjectDetector, optimizer: torch.optim.Optimizer, back_prop:bool=False) -> tuple[Any, Any]:
+def compute_loss(loader: DataLoader, object_detector: torch.nn.Module, optimizer: torch.optim.Optimizer, back_prop:bool=False) -> tuple[Any, Any]:
     # initialize the total loss and number of correct predictions
     total_loss, correct = 0, 0
     total_samples = 0
@@ -141,7 +166,7 @@ def compute_loss(loader: DataLoader, object_detector: ObjectDetector, optimizer:
     # return sample-level averages of the loss and accuracy
     return total_loss / total_samples, correct / total_samples
 
-def train(object_detector:ObjectDetector, optimizer:torch.optim.Optimizer, train_loader:DataLoader, val_loader:DataLoader, plots: dict[str, list[Any]], store_model: bool = False):
+def train(object_detector: torch.nn.Module, optimizer: torch.optim.Optimizer, train_loader: DataLoader, val_loader: DataLoader, plots: dict[str, list[Any]], store_model: bool = False):
     # loop over epochs
     logger.debug("**** training the network...")
     prev_val_acc = None
@@ -203,10 +228,7 @@ def train(object_detector:ObjectDetector, optimizer:torch.optim.Optimizer, train
                 # one needs to explicitly set the eval mode before saving
                 object_detector.eval()
                 torch.save(object_detector, config.BEST_MODEL_PATH)
-        
-        if not store_model:
-            logger.debug(f"Val acc: {val_acc} - prev: {prev_val_acc}")
-            logger.debug(f"Val loss: {val_loss} - prev: {prev_val_loss}")
+
 
 def main():
     args = setup_args()
@@ -224,8 +246,8 @@ def main():
     train_loader, val_loader, test_loader = get_loaders(data)
 
     # create our custom object detector model and upload to the current device
-    logger.info("**** initializing network...")
-    object_detector = ObjectDetector(len(config.LABELS)).to(config.DEVICE)
+    logger.info(f"**** initializing {args.model} network...")
+    object_detector = get_model(args.model, len(config.LABELS)).to(config.DEVICE)
 
     # initialize the optimizer, compile the model, and show the model summary
     optimizer = Adam(object_detector.parameters(), lr=config.INIT_LR)
@@ -234,13 +256,12 @@ def main():
     # initialize history variables for future plot
     plots = defaultdict(list)
 
+    with Timer():
+        train(object_detector=object_detector, optimizer=optimizer, train_loader=train_loader, val_loader=val_loader, plots=plots, store_model=args.save_model)
+
     logger.info("**** saving LAST object detector model...")
     object_detector.eval()
     torch.save(object_detector, config.LAST_MODEL_PATH)
-
-    with Timer():
-        train(object_detector=object_detector, optimizer=optimizer, train_loader=train_loader, val_loader=val_loader, plots=plots, store_model=True)
-
 
     display_graphs(plots, args.save_plots)
 

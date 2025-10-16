@@ -89,7 +89,6 @@ def test_model(model: nn.Module, data: list[tuple[str, int,int,int,int,str]], sh
 
 def main():
     arg = setup_args_prediction()
-    print(arg)
     model = load_model(config.LAST_MODEL_PATH, config.DEVICE)
     data = load_data(arg.filename)
     test_model(model=model, data=data, show_all=arg.show_all_images)
