@@ -53,6 +53,36 @@ for filename in "${files[@]}"; do
     if [ -f "${filename}.pdf" ]; then
         mv "${filename}.pdf" "network_diagrams/"
         echo "Moved ${filename}.pdf to network_diagrams/"
+        
+        # Convert PDF to PNG with high quality
+        echo "Converting ${filename}.pdf to PNG..."
+        cd "network_diagrams"
+        
+        # Check if ImageMagick magick is available (newer versions)
+        if command -v magick >/dev/null 2>&1; then
+            magick -density 300 "${filename}.pdf" -quality 90 "${filename}.png"
+            echo "Generated ${filename}.png using ImageMagick"
+        # Check if ImageMagick convert is available (older versions)
+        elif command -v convert >/dev/null 2>&1; then
+            convert -density 300 "${filename}.pdf" -quality 90 "${filename}.png"
+            echo "Generated ${filename}.png using ImageMagick (legacy convert command)"
+        # Check if pdftoppm is available (from poppler-utils)
+        elif command -v pdftoppm >/dev/null 2>&1; then
+            pdftoppm -png -r 300 "${filename}.pdf" "${filename}"
+            # pdftoppm generates filename-1.png, rename to filename.png
+            if [ -f "${filename}-1.png" ]; then
+                mv "${filename}-1.png" "${filename}.png"
+                echo "Generated ${filename}.png using pdftoppm"
+            fi
+        # Check if sips is available (macOS built-in)
+        elif command -v sips >/dev/null 2>&1; then
+            sips -s format png "${filename}.pdf" --out "${filename}.png"
+            echo "Generated ${filename}.png using sips"
+        else
+            echo "Warning: No PDF to PNG converter found. Install ImageMagick, poppler-utils, or use macOS sips"
+        fi
+        
+        cd ..
     else
         echo "No file named: ${filename}.pdf"
     fi
@@ -68,6 +98,7 @@ cd "$PROJECT_ROOT"
 echo ""
 echo "All network diagrams generated successfully!"
 echo "PDFs saved to: $OUTPUT_DIR"
+echo "PNGs saved to: $OUTPUT_DIR"
 
 # Open all PDFs (macOS)
 if [[ "$OSTYPE" == "darwin"* ]]; then
