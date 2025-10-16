@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Array of files to process (without .py extension)
-INPUT_DIR="archs"
+INPUT_DIR="src/draw_network/archs"
 files=("draw_deeper_detector" "draw_resnet_detector" "draw_simple_detector")
 
-# Get the project root directory (two levels up from this script)
+# Get the project root directory (script is at project root)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT="$( cd "$SCRIPT_DIR" && pwd )"
-OUTPUT_DIR="$PROJECT_ROOT/network_diagrams"
+PROJECT_ROOT="$SCRIPT_DIR"
+OUTPUT_DIR="$PROJECT_ROOT/src/draw_network/network_diagrams"
 
 # Create network_diagrams directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
@@ -16,30 +16,29 @@ mkdir -p "$OUTPUT_DIR"
 for filename in "${files[@]}"; do
     echo "Processing $filename..."
     
-    # Generate LaTeX file
-    file_path="${INPUT_DIR}/${filename}"
-    echo "Running: python3 ${file_path}.py"
+    # Full path to the Python file
+    file_path="${PROJECT_ROOT}/${INPUT_DIR}/${filename}.py"
+    echo "Running: python3 ${file_path}"
     
-    # Change to the directory containing the Python file to ensure relative paths work
-    cd "${INPUT_DIR}"
-    python3 "${filename}.py"
+    # Run the Python script from the project root to maintain relative paths
+    cd "$PROJECT_ROOT"
+    python3 "${file_path}"
     
     if [ $? -ne 0 ]; then
         echo "Error: Failed to generate LaTeX for $filename"
-        cd ..
         continue
     fi
     
-    # Check if LaTeX file was generated (in current directory - archs/)
-    if [ ! -f "${filename}.tex" ]; then
+    # Check if LaTeX file was generated in the archs directory
+    tex_file="${PROJECT_ROOT}/${INPUT_DIR}/${filename}.tex"
+    if [ ! -f "$tex_file" ]; then
         echo "Error: LaTeX file ${filename}.tex was not generated"
-        cd ..
         continue
     fi
     
-    # Move LaTeX file to parent directory for compilation
-    mv "${filename}.tex" "../${filename}.tex"
-    cd ..
+    # Move to src/draw_network for compilation
+    cd "${PROJECT_ROOT}/src/draw_network"
+    mv "archs/${filename}.tex" "${filename}.tex"
     
     # Compile to PDF
     echo "Compiling: pdflatex ${filename}.tex"
@@ -52,8 +51,8 @@ for filename in "${files[@]}"; do
     
     # Move PDF to network_diagrams
     if [ -f "${filename}.pdf" ]; then
-        mv "${filename}.pdf" "$OUTPUT_DIR/"
-        echo "Moved ${filename}.pdf to $OUTPUT_DIR"
+        mv "${filename}.pdf" "network_diagrams/"
+        echo "Moved ${filename}.pdf to network_diagrams/"
     else
         echo "No file named: ${filename}.pdf"
     fi
@@ -62,6 +61,9 @@ for filename in "${files[@]}"; do
     rm -f "${filename}.aux" "${filename}.log" "${filename}.vscodeLog" "${filename}.tex"
     
 done
+
+# Return to project root
+cd "$PROJECT_ROOT"
 
 echo ""
 echo "All network diagrams generated successfully!"

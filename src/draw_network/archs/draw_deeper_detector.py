@@ -5,7 +5,9 @@ import os
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, "../../.."))
 plotnn_path = os.path.join(project_root, "PlotNeuralNet")
+
 sys.path.insert(0, plotnn_path)
+sys.path.insert(0, project_root)
 
 from PlotNeuralNet.pycore.tikzeng import *
 
