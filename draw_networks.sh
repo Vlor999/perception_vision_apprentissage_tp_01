@@ -2,15 +2,17 @@
 
 # Array of files to process (without .py extension)
 INPUT_DIR="src/draw_network/archs"
-files=("draw_deeper_detector" "draw_resnet_detector" "draw_simple_detector")
+files=("draw_deeper_detector" "draw_resnet_detector" "draw_simple_detector" "draw_resnet_unfrozen_detector" "draw_vgg_inspired_detector")
 
 # Get the project root directory (script is at project root)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$SCRIPT_DIR"
 OUTPUT_DIR="$PROJECT_ROOT/src/draw_network/network_diagrams"
+LATEX_DIR="$OUTPUT_DIR/latex_files"
 
-# Create network_diagrams directory if it doesn't exist
+# Create network_diagrams and latex_files directories if they don't exist
 mkdir -p "$OUTPUT_DIR"
+mkdir -p "$LATEX_DIR"
 
 # Process each file
 for filename in "${files[@]}"; do
@@ -35,6 +37,10 @@ for filename in "${files[@]}"; do
         echo "Error: LaTeX file ${filename}.tex was not generated"
         continue
     fi
+    
+    # Copy LaTeX file to latex_files directory for preservation
+    cp "$tex_file" "$LATEX_DIR/${filename}.tex"
+    echo "Saved LaTeX file to latex_files/${filename}.tex"
     
     # Move to src/draw_network for compilation
     cd "${PROJECT_ROOT}/src/draw_network"
@@ -99,6 +105,7 @@ echo ""
 echo "All network diagrams generated successfully!"
 echo "PDFs saved to: $OUTPUT_DIR"
 echo "PNGs saved to: $OUTPUT_DIR"
+echo "LaTeX files saved to: $LATEX_DIR"
 
 # Open all PDFs (macOS)
 if [[ "$OSTYPE" == "darwin"* ]]; then
