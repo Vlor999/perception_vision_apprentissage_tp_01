@@ -1,3 +1,4 @@
+
 import sys
 import os
 
@@ -11,68 +12,69 @@ sys.path.insert(0, project_root)
 
 from PlotNeuralNet.pycore.tikzeng import *
 
-# SimpleDetector Architecture
-# VGG11-inspired feature extraction layers
 arch = [
     to_head(plotnn_path),
     to_cor(),
     to_begin(),
-    # Feature extraction block 1: 224x224  to  56x56
+    # Conv layer 1: 3 -> 32 channels
     to_Conv(
         "conv1",
         224,
         32,
         offset="(0,0,0)",
         to="(0,0,0)",
-        height=56,
-        depth=56,
+        height=224,
+        depth=224,
         width=4,
         caption="Conv 3 to 32",
     ),
+    # MaxPool 4x4
     to_Pool(
         "pool1",
         offset="(0,0,0)",
         to="(conv1-east)",
-        height=14,
-        depth=14,
+        height=56,
+        depth=56,
         width=1,
         opacity=0.5,
     ),
-    # Feature extraction block 2: 56x56  to  14x14
+    # Conv layer 2: 32 -> 64 channels
     to_Conv(
         "conv2",
         56,
         64,
         offset="(2,0,0)",
         to="(pool1-east)",
-        height=14,
-        depth=14,
-        width=6,
+        height=56,
+        depth=56,
+        width=8,
         caption="Conv 32 to 64",
     ),
     to_connection("pool1", "conv2"),
+    # MaxPool 4x4
     to_Pool(
         "pool2",
         offset="(0,0,0)",
         to="(conv2-east)",
-        height=7,
-        depth=7,
+        height=14,
+        depth=14,
         width=1,
         opacity=0.5,
     ),
-    # Feature extraction block 3: 14x14  to  3x3
+    # Conv layer 3: 64 -> 64 channels
     to_Conv(
         "conv3",
         14,
         64,
         offset="(2,0,0)",
         to="(pool2-east)",
-        height=7,
-        depth=7,
-        width=6,
+        height=14,
+        depth=14,
+        width=8,
         caption="Conv 64 to 64",
     ),
     to_connection("pool2", "conv3"),
+    # MaxPool 4x4
     to_Pool(
         "pool3",
         offset="(0,0,0)",
@@ -95,7 +97,7 @@ arch = [
         caption="Flatten\\\\576",
     ),
     to_connection("pool3", "flatten"),
-    # Classifier - FC layers
+    # Fully connected layer 1: 576 -> 32
     to_Conv(
         "fc1",
         1,
@@ -104,15 +106,16 @@ arch = [
         to="(flatten-east)",
         height=32,
         depth=32,
-        width=3,
+        width=4,
         caption="FC 576 to 32",
     ),
     to_connection("flatten", "fc1"),
+    # Fully connected layer 2: 32 -> 16
     to_Conv(
         "fc2",
         1,
         16,
-        offset="(2,0,0)",
+        offset="(3,0,0)",
         to="(fc1-east)",
         height=16,
         depth=16,
@@ -120,12 +123,24 @@ arch = [
         caption="FC 32 to 16",
     ),
     to_connection("fc1", "fc2"),
+    # Fully connected layer 3: 16 -> 3
+    to_Conv(
+        "fc3",
+        1,
+        3,
+        offset="(3,0,0)",
+        to="(fc2-east)",
+        height=8,
+        depth=8,
+        width=2,
+        caption="FC 16 to 3",
+    ),
+    to_connection("fc2", "fc3"),
     # Output
-    to_SoftMax("output", 3, "(2,0,0)", "(fc2-east)", caption="Output\\\\3 classes"),
-    to_connection("fc2", "output"),
+    to_SoftMax("output", 3, "(2,0,0)", "(fc3-east)", caption="Output\\\\3 classes"),
+    to_connection("fc3", "output"),
     to_end(),
 ]
-
 
 def main():
     namefile = str(sys.argv[0]).split(".")[0]
