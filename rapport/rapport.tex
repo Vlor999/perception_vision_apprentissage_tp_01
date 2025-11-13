@@ -1,0 +1,759 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm, headheight=14pt}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{TP1: Introduction to Neural Networks}
+\lhead{Computer Vision and Pattern Recognition}
+\cfoot{\thepage}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={TP1 Report - Introduction to Neural Networks},
+    pdfauthor={ENSIMAG 3A},
+}
+
+\title{
+    \vspace{-2cm}
+    \textbf{Computer Vision and Pattern Recognition} \\
+    \vspace{0.5cm}
+    \Large{Practical Work 1: Introduction to Neural Networks} \\
+    \vspace{0.3cm}
+    \large{Object Detection and Classification} \\
+    \vspace{0.3cm}
+    \large{ADNET Willem}
+}
+\author{ENSIMAG - 3A - MMIS}
+\date{December 2024}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+This report presents a comprehensive study on deep learning approaches for object detection and classification. We implement and compare multiple convolutional neural network architectures, ranging from simple custom networks to advanced pre-trained models like ResNet18. The study encompasses both classification and bounding box regression tasks on a dataset containing three categories: airplanes, motorcycles, and faces. Our experiments demonstrate the effectiveness of transfer learning and the importance of architectural choices in achieving robust object detection performance.
+\end{abstract}
+
+\newpage
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+This practical work explores the fundamentals of deep learning for computer vision, specifically focusing on object detection tasks. The main objectives are:
+
+\begin{itemize}[leftmargin=*]
+    \item Understanding PyTorch framework and neural network training pipelines
+    \item Implementing and comparing different CNN architectures
+    \item Exploring transfer learning with pre-trained models
+    \item Extending classification networks to bounding box regression
+    \item Analyzing model performance and failure cases
+\end{itemize}
+
+The experiments were conducted on the Apple Silicon GPU (MPS). All models were trained on a custom dataset containing images from three categories: faces, motorcycles, and airplanes.
+
+\section{Dataset and Experimental Setup}
+
+\subsection{Dataset Description}
+
+The dataset used in this work consists of images from three categories:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Faces}: Human facial images
+    \item \textbf{Motorcycles}: Various motorcycle images
+    \item \textbf{Airplanes}: Different airplane models and angles
+\end{itemize}
+
+The dataset is split into three subsets:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Training set}: Used for model parameter optimization
+    \item \textbf{Validation set}: Used for hyperparameter tuning and model selection
+    \item \textbf{Test set}: Used for final performance evaluation
+\end{itemize}
+
+All images are normalized to 224$\times$224 pixels, following the ImageNet standard. Bounding box annotations are provided for each object and normalized to the [0,1] $\times$ [0,1] coordinate space.
+
+\subsection{Training Configuration}
+
+The standard training configuration across all experiments includes:
+\begin{itemize}[leftmargin=*]
+    \item Batch size: 32
+    \item Default epochs: 20 (extended to 50-200 for specific experiments)
+    \item Optimizer: Adam
+    \item Loss functions: Cross-entropy (classification) + MSE (bounding box regression)
+\end{itemize}
+
+\section{Part 1: Simple Classification Network}
+
+\subsection{Initial Observations}
+
+The first experiments were conducted with the \texttt{SimpleDetector} architecture, a basic convolutional neural network designed for object classification. Initial training with the last epoch model revealed significant performance issues:
+
+\begin{table}[H]
+    \centering
+    \caption{Initial Model Performance (Last Epoch)}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Dataset} & \textbf{Overall} & \textbf{Face} & \textbf{Motorcycle} & \textbf{Airplane} \\
+        \midrule
+        Train & 48.3\% & 0.0\% & 94.4\% & 27.1\% \\
+        Validation & 46.8\% & 0.0\% & 92.2\% & 29.6\% \\
+        Test & 47.1\% & 0.0\% & 93.2\% & 37.0\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Key observations:}
+\begin{itemize}[leftmargin=*]
+    \item The model shows severe bias toward predicting motorcycles
+    \item Face detection completely fails (0\% accuracy)
+    \item Airplane detection is weak ($\approx$30\% accuracy)
+    \item The model suffers from class imbalance issues
+\end{itemize}
+
+\subsection{Model Selection Strategy}
+
+To address these issues, we implemented a best-model selection strategy based on validation performance. The model with the highest validation accuracy is saved. In case of a tie, the model with the lowest validation loss is selected. This approach significantly improved performance:
+
+\begin{itemize}[leftmargin=*]
+    \item After implementing best-model selection, test accuracy increased to \textbf{95\%}
+    \item Training for 50 epochs showed the model reached peak performance around epoch 30-40
+    \item Extended training to 200 epochs achieved \textbf{100\% accuracy} on all sets
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{../output/convergence_plot.png}
+    \caption{Training and validation loss/accuracy evolution over 20 epochs for SimpleDetector}
+    \label{fig:simple_convergence}
+\end{figure}
+
+\subsection{Impact of Training Set Size}
+
+We conducted experiments with varying training set sizes to understand the relationship between data quantity and model performance:
+
+\begin{table}[H]
+    \centering
+    \caption{Performance vs. Training Set Size}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Train Set Size} & \textbf{Epochs} & \textbf{Test Accuracy} & \textbf{Val Accuracy} \\
+        \midrule
+        1\% & 20-50 & 69\% & 73\% \\
+        5\% & 50 & 85\% & 89\% \\
+        20\% & 20 & 97\% & 96\% \\
+        20\% & 40 & 99\% & 98\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Conclusion:} A larger training set significantly improves performance, even with fewer epochs. With only 20\% of the data, the model achieves near-perfect accuracy in 40 epochs.
+
+\subsection{Regularization Techniques}
+
+\subsubsection{Effect of Dropout and Batch Normalization}
+
+We analyzed the impact of regularization techniques by training models with and without dropout and batch normalization layers.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{../doc/removing_dropout_norm.png}
+    \caption{Training dynamics with dropout and batch normalization removed. Note the increased instability in validation metrics.}
+    \label{fig:no_regularization}
+\end{figure}
+
+\textbf{Observations:}
+\begin{itemize}[leftmargin=*]
+    \item Without regularization, training is less stable
+    \item Validation loss and accuracy show more fluctuation
+    \item Risk of overfitting increases significantly
+    \item Batch normalization provides smoother convergence
+\end{itemize}
+
+\subsection{Web Image Testing}
+
+We tested the trained model on images downloaded from the internet:
+
+\begin{table}[H]
+    \centering
+    \caption{Performance on Web Images}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Category} & \textbf{Correct} & \textbf{Total} & \textbf{Accuracy} \\
+        \midrule
+        Face & 3 & 4 & 75\% \\
+        Motorcycle & 3 & 3 & 100\% \\
+        Airplane & 3 & 3 & 100\% \\
+        \midrule
+        \textbf{Overall} & \textbf{9} & \textbf{10} & \textbf{90\%} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Failure case analysis:} The model failed on an image containing multiple faces. This is expected since the training data only contained single-object images. This highlights the importance of training data diversity for model generalization.
+
+\section{Part 2: Advanced Architectures}
+
+\subsection{Network Architectures}
+
+We implemented and compared four different architectures:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{SimpleDetector}: Basic CNN with few layers
+    \item \textbf{DeeperDetector}: Extended architecture with more convolutional layers
+    \item \textbf{VGGInspired}: Architecture inspired by VGG11 with 512 features instead of 4096
+    \item \textbf{ResNetObjectDetector}: ResNet18 with custom classification head
+\end{enumerate}
+
+\subsubsection{Architecture Visualizations}
+
+The network architectures were visualized using PlotNeuralNet\footnote{PlotNeuralNet: \url{https://github.com/HarisIqbal88/PlotNeuralNet}}, a \LaTeX-based tool for drawing neural network architectures. The following figures present detailed visualizations of each model architecture, showing the progression from simple to complex designs.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{../src/draw_network/network_diagrams/draw_simple_detector.png}
+    \caption{SimpleDetector architecture: A basic CNN with 3 convolutional blocks followed by 3 fully connected layers. Features: 32→64→64 channels with progressive pooling, resulting in 576 flattened features.}
+    \label{fig:simple_arch}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../src/draw_network/network_diagrams/draw_deeper_detector.png}
+    \caption{DeeperDetector architecture: An extended CNN with 10 convolutional layers organized in 4 blocks. Features progression: 32→64→128→256→512 channels with 4 pooling operations. The model uses 6 fully connected layers (25088→1024→512→256→128→64→3) for classification.}
+    \label{fig:deeper_arch}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../src/draw_network/network_diagrams/draw_vgg_inspired_detector.png}
+    \caption{VGGInspired architecture: Based on VGG11 with simplified fully connected layers. Uses 8 convolutional layers with channel progression: 64→128→256×2→512×4. The FC layers are reduced from VGG's original 4096 to 512 features to prevent overfitting on the smaller dataset.}
+    \label{fig:vgg_arch}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../src/draw_network/network_diagrams/draw_resnet_detector.png}
+    \caption{ResNet18 (Frozen) architecture: Pre-trained ResNet18 backbone with frozen convolutional features. The network contains 20 convolutional layers from the pre-trained model, followed by custom fully connected layers (512→512→3) for task-specific classification.}
+    \label{fig:resnet_arch}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../src/draw_network/network_diagrams/draw_resnet_unfrozen_detector.png}
+    \caption{ResNet18 (Unfrozen) architecture: Same ResNet18 backbone as frozen version, but with all convolutional layers fine-tuned during training. This allows the entire network to adapt to the specific object detection task, particularly beneficial for bounding box regression.}
+    \label{fig:resnet_unfrozen_arch}
+\end{figure}
+
+\subsection{Comprehensive Model Comparison}
+
+All models were trained for 20 epochs with identical hyperparameters to ensure fair comparison.
+
+\subsubsection{Training Performance}
+
+\begin{table}[H]
+    \centering
+    \caption{Training Loss Comparison}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Model} & \textbf{Final Loss} & \textbf{Mean Loss} & \textbf{Std Dev} & \textbf{Convergence} \\
+        \midrule
+        SimpleDetector & 0.0107 & 0.1066 & ±0.1322 & Moderate \\
+        DeeperDetector & 0.0001 & 0.0431 & ±0.1122 & Good \\
+        VGGInspired & 0.0000 & 0.0278 & ±0.0470 & Good \\
+        ResNet & 0.0001 & 0.0055 & ±0.0160 & Excellent \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{Training Accuracy Comparison}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Model} & \textbf{Final Accuracy} & \textbf{Mean Accuracy} & \textbf{Performance} \\
+        \midrule
+        SimpleDetector & 99.88\% & 99.10\% ±1.65\% & Good \\
+        DeeperDetector & 100.0\% & 98.38\% ±5.15\% & Very Good \\
+        VGGInspired & 100.0\% & 98.95\% ±2.06\% & Very Good \\
+        ResNet & 100.0\% & 99.99\% ±0.02\% & Excellent \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Validation Performance}
+
+\begin{table}[H]
+    \centering
+    \caption{Validation Performance Comparison}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Model} & \textbf{Val Accuracy} & \textbf{Val Loss} & \textbf{Generalization} \\
+        \midrule
+        SimpleDetector & 99.01\% & 0.0329 & Good \\
+        DeeperDetector & 99.51\% & 0.0414 & Very Good \\
+        VGGInspired & 99.01\% & 0.0617 & Good \\
+        ResNet & 100.0\% & 0.0001 & Excellent \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Computational Efficiency}
+
+\begin{table}[H]
+    \centering
+    \caption{Epoch Time Comparison (20 epochs)}
+    \begin{tabular}{lc}
+        \toprule
+        \textbf{Model} & \textbf{Training Time} \\
+        \midrule
+        SimpleDetector & 1m 38s \\
+        DeeperDetector & 3m 02s \\
+        VGGInspired & 7m 02s \\
+        ResNet & 1m 58s \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../doc/Comparaison_models.png}
+    \caption{Comprehensive comparison of model performance metrics}
+    \label{fig:model_comparison}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../doc/COmparaison_models_progression.png}
+    \caption{Training progression for all models over 20 epochs}
+    \label{fig:model_progression}
+\end{figure}
+
+\subsection{Key Findings}
+
+\subsubsection{Training Convergence}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{ResNet}: Best overall performance with lowest loss variance (±0.0160) and near-perfect accuracy from early epochs due to pre-trained weights
+    \item \textbf{VGGInspired \& DeeperDetector}: Good convergence but require more epochs than ResNet
+    \item \textbf{SimpleDetector}: Moderate performance with higher variance, indicating some training instability
+\end{itemize}
+
+\subsubsection{Generalization Capability}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{ResNet}: Perfect validation accuracy with excellent generalization
+    \item \textbf{DeeperDetector}: Best among non-pre-trained models
+    \item \textbf{VGGInspired}: Good performance but slightly more prone to overfitting
+    \item \textbf{SimpleDetector}: Largest gap between training and validation performance
+\end{itemize}
+
+\subsubsection{Transfer Learning Impact}
+\begin{itemize}[leftmargin=*]
+    \item Pre-trained ResNet achieves excellent results with minimal training
+    \item Transfer learning significantly reduces required training time
+    \item From-scratch models require substantially more training for comparable results
+\end{itemize}
+
+\subsubsection{Computational Efficiency}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{ResNet}: Best performance/computation ratio
+    \item \textbf{SimpleDetector}: Fastest but lowest final performance
+    \item \textbf{VGGInspired}: Highest computational cost (4.3× slower than SimpleDetector) with marginal gains over DeeperDetector
+\end{itemize}
+
+\section{Part 3: Bounding Box Regression}
+
+\subsection{Multi-Task Learning Architecture}
+
+We extended our classification networks to perform both classification and bounding box regression simultaneously. This multi-task learning approach shares convolutional features between two task-specific heads:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Classification head}: Original fully connected layers for category prediction
+    \item \textbf{Regression head}: New branch with structure: Linear → ReLU → Linear → ReLU → Linear → Sigmoid
+\end{itemize}
+
+The sigmoid activation ensures bounding box coordinates remain in the normalized [0,1] range. Notably, dropout is omitted from the regression branch to maintain precise coordinate predictions.
+
+\subsection{Training Dynamics}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../doc/bbox_data/convergence_plot_simple.png}
+    \caption{SimpleDetector}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../doc/bbox_data/convergence_plot_deeper.png}
+    \caption{DeeperDetector}
+\end{subfigure}
+
+\vspace{0.5cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../doc/bbox_data/convergence_plot_vgg.png}
+    \caption{VGGInspired}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../doc/bbox_data/convergence_plot_resnet.png}
+    \caption{ResNetObjectDetector}
+\end{subfigure}
+
+\caption{Training convergence with bounding box regression for all architectures}
+\label{fig:bbox_convergence}
+\end{figure}
+
+\subsection{Transfer Learning: Frozen vs. Unfrozen Features}
+
+A critical experiment compared frozen ResNet features (transfer learning without fine-tuning) versus unfrozen features (full model fine-tuning).
+
+\begin{table}[H]
+    \centering
+    \caption{Frozen vs. Unfrozen ResNet: Bounding Box Performance}
+    \begin{tabular}{llcccc}
+        \toprule
+        \textbf{Category} & \textbf{Model} & \textbf{Mean Distance} & \textbf{Mean IoU} & \textbf{IoU $\geq$ 0.5} & \textbf{IoU $\geq$ 0.7} \\
+        \midrule
+        Face & Frozen & 0.2799 & 0.4242 & 40.0\% & 5.0\% \\
+        Face & Unfrozen & 0.1196 & 0.6879 & 91.2\% & 52.6\% \\
+        \midrule
+        Motorcycle & Frozen & 0.2442 & 0.4242 & 40.0\% & 5.0\% \\
+        Motorcycle & Unfrozen & 0.1039 & 0.5718 & 70.3\% & 17.6\% \\
+        \midrule
+        Airplane & Frozen & 0.2520 & 0.5339 & 64.4\% & 12.3\% \\
+        Airplane & Unfrozen & 0.0926 & 0.7895 & 100.0\% & 91.8\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Key insight:} Unfreezing the backbone dramatically improves bounding box localization. While classification remains excellent in both cases, regression benefits significantly from feature fine-tuning. The improvement is most pronounced for faces (47.6\% increase in IoU $\geq$ 0.7) and airplanes (79.5\% increase).
+
+\subsection{Comprehensive Bounding Box Performance}
+
+All models were trained for 20 epochs with bounding box regression enabled.
+
+\subsubsection{Overall Performance Metrics}
+
+\begin{table}[H]
+    \centering
+    \caption{Bounding Box Regression Performance (Test Set)}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Model} & \textbf{Mean IoU} & \textbf{Mean Distance} & \textbf{IoU $\geq$ 0.5} & \textbf{IoU $\geq$ 0.7} \\
+        \midrule
+        SimpleDetector & 0.803 & 0.083 & 97.1\% & 77.5\% \\
+        DeeperDetector & 0.833 & 0.071 & 100.0\% & 91.2\% \\
+        VGGInspired & 0.852 & 0.062 & 100.0\% & 97.1\% \\
+        ResNet (Frozen) & 0.660 & 0.156 & 85.3\% & 47.1\% \\
+        ResNet (Unfrozen) & 0.758 & 0.104 & 97.5\% & 78.9\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Per-Category Analysis}
+
+\begin{table}[H]
+    \centering
+    \caption{Detailed Per-Category Bounding Box Performance}
+    \scriptsize
+    \begin{tabular}{llcccc}
+        \toprule
+        \textbf{Model} & \textbf{Category} & \textbf{Mean IoU} & \textbf{Distance} & \textbf{Good (\%)} & \textbf{Very Good (\%)} \\
+        \midrule
+        SimpleDetector & Face & 0.646 & 0.141 & 89.5 & 31.6 \\
+        SimpleDetector & Motorcycle & 0.848 & 0.071 & 100.0 & 93.2 \\
+        SimpleDetector & Airplane & 0.881 & 0.051 & 100.0 & 97.3 \\
+        \midrule
+        DeeperDetector & Face & 0.754 & 0.092 & 100.0 & 77.2 \\
+        DeeperDetector & Motorcycle & 0.872 & 0.059 & 100.0 & 97.3 \\
+        DeeperDetector & Airplane & 0.855 & 0.065 & 100.0 & 95.9 \\
+        \midrule
+        VGGInspired & Face & 0.809 & 0.071 & 100.0 & 91.2 \\
+        VGGInspired & Motorcycle & 0.851 & 0.068 & 100.0 & 98.6 \\
+        VGGInspired & Airplane & 0.886 & 0.048 & 100.0 & 100.0 \\
+        \midrule
+        ResNet (Frozen) & Face & 0.499 & 0.209 & 50.9 & 15.8 \\
+        ResNet (Frozen) & Motorcycle & 0.726 & 0.139 & 100.0 & 60.8 \\
+        ResNet (Frozen) & Airplane & 0.718 & 0.132 & 97.3 & 57.5 \\
+        \midrule
+        ResNet (Unfrozen) & Face & 0.688 & 0.120 & 91.2 & 52.6 \\
+        ResNet (Unfrozen) & Motorcycle & 0.781 & 0.104 & 100.0 & 86.5 \\
+        ResNet (Unfrozen) & Airplane & 0.790 & 0.093 & 100.0 & 91.8 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../doc/compare_all_bbox/model_comparaison_bbox.png}
+    \caption{Comparative histograms of model performance with bounding box regression}
+    \label{fig:bbox_comparison}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../doc/compare_all_bbox/training_comparaison_bbox.png}
+    \caption{Training progression comparison for all models with bounding box regression}
+    \label{fig:bbox_progression}
+\end{figure}
+
+\subsection{Key Observations}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{VGGInspired}: Achieves the best overall bounding box performance with 100\% good detection rate and 97.1\% very good detection rate, including perfect airplane localization (100\% IoU $\geq$ 0.7)
+    
+    \item \textbf{DeeperDetector}: Excellent performance with 100\% good detection rate and 91.2\% very good detection rate, demonstrating that custom deeper architectures can rival sophisticated pre-trained models for this task
+    
+    \item \textbf{Transfer Learning Paradox}: Surprisingly, custom architectures (VGGInspired, DeeperDetector) consistently outperform both frozen and unfrozen ResNet for bounding box regression, despite ResNet's superior classification performance
+    
+    \item \textbf{Face Localization Challenge}: All models show weakest performance on faces. SimpleDetector achieves only 31.6\% very good detection for faces, while even the best model (VGGInspired) reaches 91.2\%
+    
+    \item \textbf{Frozen Features Limitation}: ResNet with frozen features performs notably poorly (47.1\% very good detection overall), highlighting that bounding box regression requires feature adaptation to the specific task
+    
+    \item \textbf{Category Imbalance}: Airplane localization is generally easiest (most models achieve $\geq$95.9\% very good detection), followed by motorcycles, then faces
+\end{itemize}
+
+\subsection{Failure Case Analysis}
+
+Testing on web images revealed an interesting failure case:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{../doc/error_plane.jpg}
+    \caption{Failure case: ResNet (unfrozen) correctly classifies the airplane but produces an incorrect bounding box. This suggests the regression head requires more specialized training or architecture adaptation.}
+    \label{fig:failure_case}
+\end{figure}
+
+The model correctly identifies the object category but fails to accurately localize it. This indicates that while the classification head leverages pre-trained features effectively, the regression head struggles to adapt these features for precise spatial localization.
+
+\section{Discussion and Conclusions}
+
+\subsection{Summary of Findings}
+
+This comprehensive study on object detection revealed several important insights:
+
+\subsubsection{Classification Performance}
+\begin{itemize}[leftmargin=*]
+    \item Pre-trained ResNet18 demonstrates superior performance for classification tasks, achieving near-perfect accuracy with minimal training
+    \item Transfer learning significantly accelerates convergence and improves generalization
+    \item Simple custom architectures can achieve excellent results (>95\%) with sufficient training data
+    \item Model selection based on validation performance is crucial; last-epoch models often underperform
+\end{itemize}
+
+\subsubsection{Bounding Box Regression}
+\begin{itemize}[leftmargin=*]
+    \item Custom deeper architectures (VGGInspired, DeeperDetector) surprisingly outperform transfer learning approaches for bounding box regression
+    \item Unfreezing pre-trained features is essential for regression tasks; frozen features yield poor localization (47\% vs. 79\% very good detection)
+    \item Multi-task learning with shared features is effective but requires careful architecture design
+    \item Face localization remains the most challenging category across all models
+\end{itemize}
+
+\subsubsection{Training Dynamics}
+\begin{itemize}[leftmargin=*]
+    \item Regularization (dropout, batch normalization) is critical for training stability
+    \item Training set size has a strong impact on performance; even 20\% of data yields 97\% accuracy
+    \item Model complexity vs. training time presents a trade-off: VGGInspired takes 4.3× longer than SimpleDetector for marginal gains in classification
+    \item Early stopping based on validation metrics prevents overfitting
+\end{itemize}
+
+\subsection{Architectural Considerations}
+
+\subsubsection{For Classification}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Best choice}: ResNet with transfer learning (fastest convergence, highest accuracy)
+    \item \textbf{Resource-constrained}: SimpleDetector (fastest training, acceptable performance)
+    \item \textbf{From-scratch training}: DeeperDetector (good balance of performance and efficiency)
+\end{itemize}
+
+\subsubsection{For Bounding Box Regression}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Best accuracy}: VGGInspired (97.1\% very good detection, perfect airplane localization)
+    \item \textbf{Best efficiency/accuracy}: DeeperDetector (91.2\% very good detection, 43\% faster than VGG)
+    \item \textbf{Transfer learning}: Requires unfrozen features; consider task-specific adaptations
+\end{itemize}
+
+\subsection{Limitations and Future Work}
+
+Several limitations were identified during this study:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Single-object limitation}: Models fail on images with multiple objects, as training data contained only single instances
+    
+    \item \textbf{Category imbalance}: Face localization consistently underperforms, suggesting need for category-specific architectures or data augmentation
+    
+    \item \textbf{Fixed input size}: 224$\times$224 normalization may lose important details for precise localization
+    
+    \item \textbf{Limited architecture exploration}: Modern architectures like EfficientNet, YOLO, or SSD could provide better performance
+\end{enumerate}
+
+\textbf{Potential improvements:}
+\begin{itemize}[leftmargin=*]
+    \item Implement attention mechanisms to focus on object regions
+    \item Explore anchor-based detection methods (YOLO, Faster R-CNN)
+    \item Apply data augmentation to increase robustness
+    \item Implement multi-scale feature fusion for better localization
+    \item Address class imbalance through weighted loss functions or oversampling
+\end{itemize}
+
+\subsection{Practical Recommendations}
+
+Based on our experimental results, we recommend:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Start with transfer learning}: Pre-trained models provide excellent starting points, especially for classification
+    
+    \item \textbf{Always validate unfrozen training}: For regression tasks, unfreezing features is often essential despite increased computational cost
+    
+    \item \textbf{Prioritize validation-based model selection}: Last-epoch models frequently underperform; save and evaluate based on validation metrics
+    
+    \item \textbf{Monitor per-category performance}: Aggregate metrics can hide category-specific failures
+    
+    \item \textbf{Balance complexity and efficiency}: VGGInspired's 4× longer training time may not justify the marginal improvement over DeeperDetector for many applications
+    
+    \item \textbf{Consider task-specific architectures}: What works best for classification may not be optimal for regression
+\end{enumerate}
+
+\subsection{Conclusion}
+
+This practical work successfully demonstrated the implementation and comparison of multiple deep learning architectures for object detection. While transfer learning with ResNet18 proved highly effective for classification (100\% accuracy in 10-20 epochs), custom architectures like VGGInspired achieved superior bounding box localization (97.1\% very good detection vs. 78.9\% for unfrozen ResNet).
+
+The experiments highlighted the importance of architectural choices, regularization techniques, and training strategies in achieving robust performance. The surprising result that custom architectures outperform transfer learning for bounding box regression suggests that pre-trained features, while excellent for classification, may require substantial task-specific adaptation for precise spatial localization tasks.
+
+Overall, this work provides a comprehensive foundation for understanding neural network design for computer vision tasks and demonstrates both the power and limitations of current approaches to object detection.
+
+\section*{Acknowledgments}
+
+This work was conducted as part of the Computer Vision and Pattern Recognition course at ENSIMAG (Grenoble INP). We acknowledge the use of the ENSIMAG GPU cluster for computational resources.
+
+Network architecture visualizations were created using PlotNeuralNet\footnote{\url{https://github.com/HarisIqbal88/PlotNeuralNet}}, developed by Haris Iqbal.
+
+\section*{References}
+
+\begin{enumerate}[label={[\arabic*]}, leftmargin=*]
+    \item Iqbal, H. (2018). PlotNeuralNet: Python and \LaTeX{} package for drawing neural networks. \url{https://github.com/HarisIqbal88/PlotNeuralNet}
+    
+    \item Redmon, J., Divvala, S., Girshick, R., \& Farhadi, A. (2016). You Only Look Once: Unified, Real-Time Object Detection. \textit{Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition}.
+\end{enumerate}
+
+\appendix
+\section{Command Reference}
+
+\subsection{Training Commands}
+You must install uv to ensure everything is in the correct environment. Follow the installation instructions at \url{https://docs.astral.sh/uv/getting-started/installation/}:
+
+\begin{lstlisting}[language=bash, caption={Install uv (Unix/macOS)}]
+curl -LsSf https://astral.sh/uv/install.sh | sh
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Install uv (Windows)}]
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+\end{lstlisting}
+
+Alternatively, you can use package managers like Homebrew (\texttt{brew install uv}), pip (\texttt{pip install uv}), or conda (\texttt{conda install -c conda-forge uv}).
+
+Once uv is installed, set up the project environment:
+\begin{lstlisting}[language=bash, caption={Synchronize project dependencies}]
+uv sync
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Activate virtual environment}]
+source .venv/bin/activate
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Train SimpleDetector model}]
+uv run python train.py --model simple --save-model true --epoch-size 20
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Training with ResNet}]
+uv run python train.py --model resnet --save-model true --epoch-size 20
+\end{lstlisting}
+
+\subsection{Evaluation Commands}
+
+\begin{lstlisting}[language=bash, caption={Evaluate trained model}]
+uv run python eval.py output/best_model.pth
+\end{lstlisting}
+
+\subsection{Prediction Commands}
+
+\begin{lstlisting}[language=bash, caption={Predict on test set}]
+uv run python predict.py --directory output/test_data.csv --show-all-images true
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Predict on single image}]
+uv run python predict.py --filename path/to/image.jpg --model best --save-file true
+\end{lstlisting}
+
+\subsection{Comparison Commands}
+
+\begin{lstlisting}[language=bash, caption={Compare all models}]
+uv run python compare_models.py
+\end{lstlisting}
+
+
+\subsection{Network Visualization}
+
+To create all the Python files that represent the models you must run:
+\begin{lstlisting}[language=bash, caption={Generate network representation files}]
+uv run python src/draw_network/archs_creation/create_files.py
+\end{lstlisting}
+Files will be created or updated in the directory: \textbf{src/draw\_network/archs/}
+
+Then you can run the following command that will create the PDF, PNG and keep the LaTeX files in the directory: \textbf{src/draw\_network/network\_diagrams/latex\_files}.
+It will also display all the PDF files.
+
+\begin{lstlisting}[language=bash, caption={Generate network diagrams}]
+./draw_networks.sh
+\end{lstlisting}
+
+\end{document}

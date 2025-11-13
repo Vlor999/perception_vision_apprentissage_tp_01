@@ -18,3 +18,12 @@ web_images/
 *.pth
 .DS_Store
 output/*.pth
+
+# Latex useless files
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.synctex(busy)
