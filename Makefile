@@ -26,3 +26,10 @@ lint-fix:
 
 type-check:
 	uv run mypy src
+
+########################################################################################################################
+# Compression
+########################################################################################################################
+
+compress-repo:
+	tar cJvf projet1.tar.xz --exclude='.venv' --exclude='__pycache__' --exclude='*/__pycache__' --exclude='matieres' --exclude='.env' --exclude='.git' --exclude='.mypy_cache' --exclude='.ruff_cache' --exclude='projet1.tar.xz' .
