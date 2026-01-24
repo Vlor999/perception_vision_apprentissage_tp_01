@@ -32,4 +32,4 @@ type-check:
 ########################################################################################################################
 
 compress-repo:
-	tar cJvf projet1.tar.xz --exclude='.venv' --exclude='__pycache__' --exclude='*/__pycache__' --exclude='matieres' --exclude='.env' --exclude='.git' --exclude='.mypy_cache' --exclude='.ruff_cache' --exclude='projet1.tar.xz' .
+	tar cJvf projet1.tar.xz --exclude='.venv' --exclude='__pycache__' --exclude='*/__pycache__' --exclude='matieres' --exclude='.env' --exclude='.git' --exclude='.mypy_cache' --exclude='.ruff_cache' --exclude='projet1.tar.xz' --exclude='*.tar*' --exclude='rapport' --exclude='.idea' --exclude='doc' --exclude='./output/*.pth' .
